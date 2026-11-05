@@ -28,7 +28,7 @@ jobs:
       - name: Obtener código
         uses: actions/checkout@v4
       - name: Instalar Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
       # El ZIP original no tenía package-lock.json. Después de crear y subir
@@ -58,7 +58,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Instalar dependencias
