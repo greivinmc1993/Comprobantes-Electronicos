@@ -3,12 +3,10 @@ const Database = require('better-sqlite3');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
+const {normalizarIdentificacion} = require('./identificaciones');
 
 const LEGACY_PROFILE_NAME = 'Sin asignar (historial anterior)';
 
-function normalizarIdentificacion(value) {
-  return String(value || '').replace(/[^\dA-Za-z]/g, '').toUpperCase();
-}
 
 function validarPerfil(input) {
   const nombre = String(input?.nombre || '').trim();
@@ -129,7 +127,71 @@ function instalarEsquema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_tc_fecha_cotizacion ON tipos_cambio_fechas(fecha_cotizacion);
   `);
-  db.pragma('user_version = 5');
+  // La papelera conserva una copia íntegra de cada XML y de las columnas SQLite.
+  // Un documento en papelera NO aparece en balances ni bloquea reimportaciones.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS papelera_documentos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      perfil_id_original INTEGER NOT NULL,
+      perfil_nombre_original TEXT NOT NULL,
+      documento_id_original INTEGER NOT NULL,
+      identidad TEXT NOT NULL,
+      clave TEXT,
+      consecutivo TEXT,
+      nombre_archivo TEXT NOT NULL,
+      fecha TEXT,
+      datos_json TEXT NOT NULL,
+      fila_json TEXT NOT NULL,
+      eliminado_en TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_papelera_eliminado_en ON papelera_documentos(eliminado_en);
+    CREATE INDEX IF NOT EXISTS idx_papelera_perfil ON papelera_documentos(perfil_id_original);
+  `);
+  // v1.4.0: importaciones auditables y mensajes externos de Hacienda.
+  if (!db.pragma('table_info(documentos)').some(col=>col.name==='lote_id'))
+    db.exec('ALTER TABLE documentos ADD COLUMN lote_id INTEGER');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS lotes_importacion (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creado_en TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      cantidad INTEGER NOT NULL DEFAULT 0,
+      deshecho_en TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_documentos_lote ON documentos(lote_id);
+    CREATE TABLE IF NOT EXISTS lotes_documentos (
+      lote_id INTEGER NOT NULL REFERENCES lotes_importacion(id),
+      documento_id INTEGER NOT NULL,
+      perfil_id_original INTEGER NOT NULL,
+      PRIMARY KEY(lote_id, documento_id)
+    );
+    CREATE TABLE IF NOT EXISTS auditoria (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      perfil_id INTEGER,
+      accion TEXT NOT NULL,
+      detalles TEXT NOT NULL DEFAULT '{}'
+    );
+    CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON auditoria(fecha);
+    CREATE TABLE IF NOT EXISTS mensajes_hacienda (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clave TEXT NOT NULL,
+      codigo TEXT NOT NULL,
+      estado TEXT NOT NULL,
+      detalle TEXT NOT NULL,
+      archivo TEXT NOT NULL,
+      hash TEXT NOT NULL UNIQUE,
+      xml_original TEXT NOT NULL,
+      importado_en TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_mensajes_clave ON mensajes_hacienda(clave);
+    CREATE TABLE IF NOT EXISTS metadatos_aplicacion (
+      clave TEXT PRIMARY KEY,
+      valor TEXT NOT NULL
+    );
+    INSERT OR IGNORE INTO metadatos_aplicacion(clave,valor)
+      VALUES ('identidad','cr.comprobanteselectronicoscr.desktop');
+  `);
+  db.pragma('user_version = 7');
 }
 
 /** Una sola base por usuario Windows, con perfiles independientes dentro de SQLite. */
@@ -151,7 +213,22 @@ function abrirBaseDatos(ruta) {
     ON CONFLICT(perfil_id, identidad) DO NOTHING
   `);
   const listar = db.prepare('SELECT id, perfil_id, datos_json FROM documentos WHERE perfil_id = ? ORDER BY fecha DESC, id DESC');
-  const borrar = db.prepare('DELETE FROM documentos WHERE id = ? AND perfil_id = ?');
+  const quitarActivo = db.prepare('DELETE FROM documentos WHERE id = ? AND perfil_id = ?');
+  const buscarActivoCompleto = db.prepare('SELECT * FROM documentos WHERE id = ? AND perfil_id = ?');
+  const agregarAPapelera = db.prepare(`INSERT INTO papelera_documentos
+    (perfil_id_original,perfil_nombre_original,documento_id_original,identidad,clave,consecutivo,
+      nombre_archivo,fecha,datos_json,fila_json)
+    VALUES (@perfil_id_original,@perfil_nombre_original,@documento_id_original,@identidad,@clave,
+      @consecutivo,@nombre_archivo,@fecha,@datos_json,@fila_json)`);
+  const obtenerPapelera = db.prepare('SELECT * FROM papelera_documentos WHERE id = ?');
+  const listarPapeleraSQL = db.prepare('SELECT * FROM papelera_documentos ORDER BY eliminado_en DESC,id DESC');
+  const quitarPapelera = db.prepare('DELETE FROM papelera_documentos WHERE id = ?');
+  const reinsertarActivo = db.prepare(`INSERT INTO documentos
+    (perfil_id,identidad,clave,consecutivo,version_xml,tipo,fecha,emisor,receptor,moneda_original,
+     tipo_cambio_aplicado,total_original,total_crc,nombre_archivo,xml_original,datos_json,creado_en)
+    VALUES (@perfil_id,@identidad,@clave,@consecutivo,@version_xml,@tipo,@fecha,@emisor,@receptor,
+     @moneda_original,@tipo_cambio_aplicado,@total_original,@total_crc,@nombre_archivo,@xml_original,
+     @datos_json,@creado_en)`);
   const contar = db.prepare('SELECT COUNT(*) AS cantidad FROM documentos WHERE perfil_id = ?');
   const crear = db.prepare(`INSERT INTO perfiles(nombre,cedula,correo,telefono,direccion,color)
     VALUES (@nombre,@cedula,@correo,@telefono,@direccion,@color)`);
@@ -182,6 +259,26 @@ function abrirBaseDatos(ruta) {
   const guardarRevisionIVA = db.prepare('UPDATE documentos SET datos_json = ? WHERE id = ?');
   const leerValoresRevisionIVA = db.prepare('SELECT total_crc, tipo_cambio_aplicado FROM documentos WHERE id = ?');
   const obtenerUSDParaRevision = db.prepare("SELECT id, nombre_archivo AS nombreArchivo, xml_original AS xml, datos_json AS datos FROM documentos WHERE moneda_original='USD' ORDER BY id");
+  const auditoriaSQL=db.prepare('INSERT INTO auditoria(perfil_id,accion,detalles) VALUES (?,?,?)');
+  const nuevoLote=db.prepare('INSERT INTO lotes_importacion(cantidad) VALUES (0)');
+  const asignarLote=db.prepare('UPDATE documentos SET lote_id=? WHERE id=?');
+  const registrarOrigenLote=db.prepare('INSERT INTO lotes_documentos(lote_id,documento_id,perfil_id_original) VALUES (?,?,?)');
+  const leerOrigenLote=db.prepare('SELECT documento_id,perfil_id_original FROM lotes_documentos WHERE lote_id=?');
+  const ultimoInsertado=db.prepare('SELECT last_insert_rowid() AS id');
+  const obtenerLote=db.prepare('SELECT * FROM lotes_importacion WHERE id=?');
+  const docsLote=db.prepare('SELECT id, perfil_id FROM documentos WHERE lote_id=? ORDER BY id');
+  const finalizarLote=db.prepare('UPDATE lotes_importacion SET cantidad=? WHERE id=?');
+  const deshacerLoteSQL=db.prepare("UPDATE lotes_importacion SET deshecho_en=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND deshecho_en IS NULL");
+  const guardarMensaje=db.prepare(`INSERT INTO mensajes_hacienda(clave,codigo,estado,detalle,archivo,hash,xml_original)
+    VALUES (@clave,@codigo,@estado,@detalle,@archivo,@hash,@xml)
+    ON CONFLICT(hash) DO NOTHING`);
+  const mensajeLista=db.prepare(`SELECT m.id,m.clave,m.codigo,m.estado,m.detalle,m.archivo,m.importado_en AS importadoEn,
+    EXISTS(SELECT 1 FROM documentos d WHERE d.clave=m.clave AND d.perfil_id=?) AS asociado
+    FROM mensajes_hacienda m WHERE EXISTS(SELECT 1 FROM documentos d WHERE d.clave=m.clave AND d.perfil_id=?)
+    ORDER BY m.importado_en DESC,m.id DESC LIMIT 500`);
+  const historialAuditoria=db.prepare('SELECT id,fecha,perfil_id AS perfilId,accion,detalles FROM auditoria ORDER BY id DESC LIMIT 300');
+  const buscarPorClave=db.prepare('SELECT d.perfil_id AS perfilId, p.nombre AS empresa FROM documentos d JOIN perfiles p ON p.id=d.perfil_id WHERE d.clave=?');
+  const ultimoBatch=db.prepare('SELECT * FROM lotes_importacion ORDER BY id DESC LIMIT 1');
   const guardarRecalculado = db.prepare(`UPDATE documentos SET tipo_cambio_aplicado=@tipoCambio,
     total_crc=@total, datos_json=@json WHERE id=@id AND moneda_original='USD'`);
 
@@ -193,13 +290,103 @@ function abrirBaseDatos(ruta) {
     return p;
   }
 
+  function validarIdsDocumentos(ids) {
+    if(!Array.isArray(ids) || ids.length<1 || ids.length>500 ||
+       ids.some(id=>!Number.isSafeInteger(id)||id<=0) || new Set(ids).size!==ids.length) {
+      throw new Error('Selecciona de 1 a 500 comprobantes sin duplicados');
+    }
+    return ids;
+  }
+  function validarDestinoDocumento(doc,destino) {
+    if (!destino.cedula) return;
+    const ids=[doc.emisor?.identificacion?.numero,doc.receptor?.identificacion?.numero]
+      .map(normalizarIdentificacion);
+    if (!ids.includes(destino.cedula)) {
+      throw new Error(`El comprobante ${doc.consecutivo||doc.clave||''} no corresponde a la cédula de «${destino.nombre}»`);
+    }
+  }
+
   function errorBase(error) {
     if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') throw new Error('Ya existe una empresa con ese nombre');
     throw error;
   }
 
+  function registrar(accion,perfilId,detalles) {
+    const texto=JSON.stringify(detalles||{});
+    if(texto.length>12000) throw new Error('Evento demasiado largo');
+    auditoriaSQL.run(perfilId||null,accion,texto);
+  }
+  function identidadDocumento(xml,doc) {
+    return doc.clave && String(doc.clave).trim() ? `clave:${String(doc.clave).trim()}`
+      : `sha256:${crypto.createHash('sha256').update(xml).digest('hex')}`;
+  }
+  function filaImportacion(xml,doc,perfil) {
+    return {perfil_id:perfil.id,identidad:identidadDocumento(xml,doc),clave:doc.clave||null,
+      consecutivo:doc.consecutivo||null,version_xml:doc.versionXML||null,tipo:doc.tipoDocumento,
+      fecha:doc.fecha||null,emisor:doc.emisor?.nombre||doc.comercio||null,receptor:doc.receptor?.nombre||null,
+      moneda_original:doc.monedaOriginal||'CRC',tipo_cambio_aplicado:Number(doc.tipoCambioAplicado)||1,
+      total_original:Number(doc.totalOriginal)||0,total_crc:Number(doc.total)||0,
+      nombre_archivo:doc.nombreArchivo||'documento.xml',xml_original:xml,datos_json:JSON.stringify(doc)};
+  }
   return {
     ruta,
+    buscarClaveEnPerfiles(clave){return buscarPorClave.all(String(clave||''));},
+    ultimoLote(){return ultimoBatch.get()||null;},
+    auditar(accion,perfilId,detalles){return registrar(accion,perfilId,detalles);},
+    historialAuditoria(){return historialAuditoria.all().map(r=>({...r,detalles:JSON.parse(r.detalles)}));},
+    mensajesHacienda(perfilId){buscarPerfil(perfilId);return mensajeLista.all(perfilId,perfilId).map(r=>({...r,asociado:Boolean(r.asociado)}));},
+    registrarMensajeHacienda(m){
+      if(!/^\d{50}$/.test(m.clave)||!m.hash) throw new Error('Mensaje Hacienda sin clave válida');
+      return db.transaction(()=>{
+        const inserted=guardarMensaje.run(m).changes>0;
+        if(inserted)registrar('MENSAJE_HACIENDA',null,{clave:m.clave,codigo:m.codigo});
+        return inserted;
+      })();
+    },
+    importarLote(items){
+      if(!Array.isArray(items)||items.length<1||items.length>10)throw new Error('El lote debe contener de 1 a 10 XML');
+      return db.transaction(()=>{
+        const id=nuevoLote.run().lastInsertRowid;
+        let nuevos=0,duplicados=0;
+        const ids=[];
+        for(const item of items) {
+          const perfil=buscarPerfil(item.perfilId);
+          const doc=item.documento;
+          if(!doc||typeof item.xml!=='string'||!doc.tipoDocumento)throw new Error('XML no revisado');
+          validarDestinoDocumento(doc,perfil);
+          const resultado=insertar.run(filaImportacion(item.xml,doc,perfil));
+          if(!resultado.changes){duplicados++;continue;}
+          const docId=resultado.lastInsertRowid;
+          asignarLote.run(id,docId);registrarOrigenLote.run(id,docId,perfil.id);ids.push(Number(docId));nuevos++;
+          registrar('IMPORTAR_XML',perfil.id,{documentoId:Number(docId),clave:doc.clave,loteId:Number(id)});
+        }
+        finalizarLote.run(nuevos,id);
+        return {loteId:Number(id),nuevos,duplicados,ids};
+      })();
+    },
+    deshacerUltimoLote(id){
+      return db.transaction(()=>{
+        const ultimo=ultimoBatch.get();
+        if(!ultimo||ultimo.id!==Number(id)||ultimo.deshecho_en)throw new Error('Solo puedes deshacer el último lote activo');
+        const filas=docsLote.all(id);
+        const originales=new Map(leerOrigenLote.all(id).map(r=>[r.documento_id,r.perfil_id_original]));
+        if(filas.some(f=>originales.get(f.id)!==f.perfil_id))throw new Error('Un comprobante del lote fue trasladado a otra empresa; usa Papelera para revisarlo');
+        if(filas.length!==ultimo.cantidad)throw new Error('Los comprobantes del lote cambiaron; revísalos en Papelera');
+        for(const fila of filas) {
+          const perfil=buscarPerfil(fila.perfil_id);
+          const original=buscarActivoCompleto.get(fila.id,perfil.id);
+          if(!original)throw new Error('Un comprobante del lote ya no está activo');
+          agregarAPapelera.run({perfil_id_original:perfil.id,perfil_nombre_original:perfil.nombre,
+            documento_id_original:original.id,identidad:original.identidad,clave:original.clave,
+            consecutivo:original.consecutivo,nombre_archivo:original.nombre_archivo,
+            fecha:original.fecha,datos_json:original.datos_json,fila_json:JSON.stringify(original)});
+          if(quitarActivo.run(original.id,perfil.id).changes!==1)throw new Error('Fallo al deshacer');
+        }
+        deshacerLoteSQL.run(id);
+        registrar('DESHACER_IMPORTACION',null,{loteId:id,documentos:filas.length});
+        return {deshechos:filas.length,loteId:id};
+      })();
+    },
     tienePerfilLegado() {
       const legado = buscarLegado.get(LEGACY_PROFILE_NAME);
       return Boolean(legado && legado.id === 1);
@@ -282,13 +469,16 @@ function abrirBaseDatos(ruta) {
     },
     perfil: buscarPerfil,
     crearPerfil(datos) {
-      const limpio = validarPerfil(datos);
-      try {return buscarPerfil(crear.run(limpio).lastInsertRowid);} catch (error) {errorBase(error);}
+      const limpio=validarPerfil(datos);
+      try {return db.transaction(()=>{const p=buscarPerfil(crear.run(limpio).lastInsertRowid);
+        registrar('CREAR_EMPRESA',p.id,{nombre:p.nombre});return p;})();}catch(error){errorBase(error);}
     },
     actualizarPerfil(id, datos) {
       buscarPerfil(id);
       const limpio = {...validarPerfil(datos), id: Number(id)};
-      try {actualizar.run(limpio); return buscarPerfil(id);} catch (error) {errorBase(error);}
+      try {return db.transaction(()=>{actualizar.run(limpio);
+        registrar('EDITAR_EMPRESA',id,{nombre:limpio.nombre});return buscarPerfil(id);})();}
+      catch (error) {errorBase(error);}
     },
     eliminarPerfil(id, {nombreConfirmacion, modo='eliminar', destinoPerfilId, documentosEsperados, confirmado} = {}) {
       const perfil = buscarPerfil(id);
@@ -320,6 +510,7 @@ function abrirBaseDatos(ruta) {
           borrarDocsPerfil.run(perfil.id);
         }
         if (borrarPerfil.run(perfil.id).changes !== 1) throw new Error('No se pudo eliminar la empresa');
+        registrar('ELIMINAR_EMPRESA',perfil.id,{nombre:perfil.nombre,modo,documentos:cantidad});
         return {eliminado:true, documentosAfectados:cantidad, modo};
       })();
     },
@@ -358,23 +549,94 @@ function abrirBaseDatos(ruta) {
       buscarPerfil(perfilId);
       return listar.all(perfilId).map(row => ({...JSON.parse(row.datos_json), id:row.id, perfilId: row.perfil_id}));
     },
-    eliminar(id, perfilId) {buscarPerfil(perfilId); return borrar.run(id,perfilId).changes > 0;},
-    mover(id, desdeId, destinoId) {
-      buscarPerfil(desdeId);
-      const destino = buscarPerfil(destinoId);
-      const doc = obtenerDocumento.get(id);
-      if (!doc || doc.perfil_id !== Number(desdeId)) throw new Error('Comprobante no encontrado en el perfil actual');
-      if (doc.perfil_id === destino.id) return false;
-      const completo = JSON.parse(db.prepare('SELECT datos_json FROM documentos WHERE id=?').get(id).datos_json);
-      if (destino.cedula) {
-        const ids = [completo.emisor?.identificacion?.numero, completo.receptor?.identificacion?.numero].map(normalizarIdentificacion);
-        if (!ids.includes(destino.cedula)) throw new Error('El comprobante no corresponde a la identificación de la empresa destino');
-      }
-      try {return mover.run(destino.id,id).changes > 0;} catch(error) {
-        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') throw new Error('Ese comprobante ya existe en la empresa destino');
-        throw error;
-      }
+    // La eliminación normal siempre es recuperable: mover del historial activo a la papelera.
+    enviarPapelera(perfilId, ids) {
+      const origen=buscarPerfil(perfilId);
+      validarIdsDocumentos(ids);
+      return db.transaction(()=>{
+        const filas=ids.map(id=>{
+          const fila=buscarActivoCompleto.get(id,origen.id);
+          if (!fila) throw new Error(`El documento ${id} no está en la empresa «${origen.nombre}». Actualiza el listado.`);
+          return fila;
+        });
+        for (const fila of filas) {
+          agregarAPapelera.run({
+            perfil_id_original:origen.id, perfil_nombre_original:origen.nombre,
+            documento_id_original:fila.id, identidad:fila.identidad, clave:fila.clave,
+            consecutivo:fila.consecutivo, nombre_archivo:fila.nombre_archivo,
+            fecha:fila.fecha, datos_json:fila.datos_json, fila_json:JSON.stringify(fila)
+          });
+          if (quitarActivo.run(fila.id,origen.id).changes!==1) throw new Error('No se pudo enviar el comprobante a la papelera');
+        }
+        registrar('ENVIAR_PAPELERA',origen.id,{cantidad:filas.length,ids});
+        return {enviados:filas.length};
+      })();
     },
+    eliminar(id, perfilId) {return this.enviarPapelera(perfilId,[id]).enviados===1;},
+    listarPapelera() {
+      return listarPapeleraSQL.all().map(row=>{
+        const doc=JSON.parse(row.datos_json);
+        return {id:row.id,perfilOriginalId:row.perfil_id_original,
+          perfilOriginalNombre:row.perfil_nombre_original,eliminadoEn:row.eliminado_en,
+          documentoIdOriginal:row.documento_id_original,clave:row.clave,
+          consecutivo:row.consecutivo,nombreArchivo:row.nombre_archivo,
+          fecha:row.fecha,tipoDocumento:doc.tipoDocumento,total:doc.total,
+          emisor:doc.emisor?.nombre||doc.comercio||'',receptor:doc.receptor?.nombre||''};
+      });
+    },
+    restaurarPapelera(ids,destinoPerfilId) {
+      validarIdsDocumentos(ids);
+      const destino=buscarPerfil(destinoPerfilId);
+      return db.transaction(()=>{
+        const filas=ids.map(id=>{
+          const fila=obtenerPapelera.get(id);
+          if (!fila) throw new Error(`El comprobante ${id} ya no está en la papelera. Actualiza el listado.`);
+          const doc=JSON.parse(fila.datos_json);
+          validarDestinoDocumento(doc,destino);
+          return fila;
+        });
+        for (const fila of filas) {
+          const snapshot=JSON.parse(fila.fila_json);
+          const columnas=['identidad','clave','consecutivo','version_xml','tipo','fecha','emisor','receptor',
+            'moneda_original','tipo_cambio_aplicado','total_original','total_crc','nombre_archivo',
+            'xml_original','datos_json','creado_en'];
+          const datos=Object.fromEntries(columnas.map(c=>[c,snapshot[c]]));
+          try {reinsertarActivo.run({...datos,perfil_id:destino.id});}
+          catch(error) {
+            if(error.code==='SQLITE_CONSTRAINT_UNIQUE' || /UNIQUE constraint failed/.test(error.message)) throw new Error(`El comprobante ${fila.consecutivo||fila.clave||fila.id} ya existe en «${destino.nombre}». No se restauró ningún documento.`);
+            throw error;
+          }
+          if(quitarPapelera.run(fila.id).changes!==1) throw new Error('No se pudo completar la restauración');
+        }
+        registrar('RESTAURAR_PAPELERA',destino.id,{cantidad:filas.length,ids});
+        return {restaurados:filas.length,destinoPerfilId:destino.id};
+      })();
+    },
+    moverLote(desdeId,ids,destinoId) {
+      const origen=buscarPerfil(desdeId);
+      const destino=buscarPerfil(destinoId);
+      if(origen.id===destino.id) throw new Error('Selecciona una empresa diferente');
+      validarIdsDocumentos(ids);
+      return db.transaction(()=>{
+        const filas=ids.map(id=>{
+          const fila=buscarActivoCompleto.get(id,origen.id);
+          if(!fila) throw new Error(`El comprobante ${id} ya no está en la empresa actual`);
+          validarDestinoDocumento(JSON.parse(fila.datos_json),destino);
+          return fila;
+        });
+        for(const fila of filas) {
+          try {
+            if(mover.run(destino.id,fila.id).changes!==1) throw new Error('No se pudo trasladar el comprobante');
+          } catch(error) {
+            if(error.code==='SQLITE_CONSTRAINT_UNIQUE' || /UNIQUE constraint failed/.test(error.message)) throw new Error(`El comprobante ${fila.consecutivo||fila.clave||fila.id} ya existe en la empresa destino. No se movió ninguno.`);
+            throw error;
+          }
+        }
+        registrar('MOVER_DOCUMENTOS',destino.id,{desdeId:origen.id,cantidad:filas.length,ids});
+        return {movidos:filas.length,destinoPerfilId:destino.id};
+      })();
+    },
+    mover(id, desdeId, destinoId) {return this.moverLote(desdeId,[id],destinoId).movidos===1;},
     respaldo(rutaDestino) {return db.backup(rutaDestino);},
     cerrar() {db.close();},
   };

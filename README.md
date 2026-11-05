@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.3.6-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.0-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -26,7 +26,7 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 ## Características
 
 - **Perfiles empresariales:** crea y edita empresas con nombre, identificación opcional, correo, teléfono y dirección. Sus comprobantes se consultan por separado.
-- **Importación XML:** admite documentos estructurados de Hacienda 4.4 (con compatibilidad parcial para versiones anteriores), con CAByS, detalle de líneas, impuestos y metadatos.
+- **Importación XML:** admite documentos estructurados de Hacienda 4.4 (con compatibilidad parcial para versiones anteriores), con CAByS, detalle de líneas, impuestos y metadatos. La v1.4.0 conserva la lectura de importes decimales como `.00`, concilia ajustes de redondeo comprobables por total de línea y conserva por separado IVA bruto e IVA neto. Las discrepancias importantes se rechazan.
 - **Tipos:** factura electrónica, tiquete, nota de crédito, nota de débito, compra, exportación y recibo electrónico de pago, según el reconocimiento implementado.
 - **Contabilidad de consulta:** suma documentos positivos, resta notas de crédito y muestra IVA neto y bases correspondientes a las líneas procesadas.
 - **Dólares a colones:** consulta la **venta de referencia BCCR a través de Hacienda** según fecha de emisión; usa una cotización oficial guardada o, si no hay conectividad, la declarada en el XML con advertencia. Conserva la fuente y la tasa aplicada.
@@ -34,6 +34,52 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Reportes:** PDF, CSV separado por `;` y Excel, siempre con el contexto del perfil y los filtros elegidos.
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
+
+
+## Novedades v1.4.0 — Desarrollo organizado en etapas
+
+**Etapa A — Seguridad y recuperación**
+
+- Restauración desde un respaldo `.sqlite` elegido mediante el diálogo de Windows, con comprobación de integridad, estructura e identidad (cuando está disponible), respaldo de emergencia y reinicio de Electron. Es una **sustitución completa** de la base, no una fusión; se conserva además una copia de la base anterior en el directorio de datos de la aplicación.
+- Los eventos de creación/edición de empresas, movimientos, Papelera, importación confirmada y mensajes Hacienda se registran en una bitácora SQLite.
+- El `appId` permanece `cr.comprobanteselectronicoscr.desktop`; **no** se utiliza el identificador de FacturaCR.
+
+**Etapa B — Importación inteligente**
+
+- Antes de guardar se muestra una **vista previa con datos de emisor, receptor, importe, moneda y empresa sugerida por cédula**. Las importaciones son explícitas; el usuario asigna el perfil y confirma.
+- Detección de claves ya existentes en otras empresas, duplicados dentro del lote y errores por archivo. SQLite confirma cada lote en una transacción y conserva su identificador.
+- **Deshacer última importación**: tras crear un respaldo, mueve los documentos de ese lote a la Papelera. Si fueron movidos de empresa o alterados, se bloquea para impedir retirar documentos inesperados.
+- Por revisión se admiten hasta 10 XML y 60 MB; si se seleccionan más, se presentan por lotes sucesivos.
+
+**Etapa C — Clasificación y conciliación**
+
+- **Compras y ventas**: separadas por la identificación del perfil como emisor o receptor; IVA, base y total conservan el signo de las notas de crédito. Sin cédula hay categoría «Sin clasificar».
+- Los **recibos electrónicos de pago** quedan en «Pago / revisar» para evitar contarlos como ventas nuevas por inferencia.
+- Conciliación de notas de crédito/débito con `InformacionReferencia.Numero` cuando el comprobante original existe en el mismo perfil. Se distingue coincidencia total/parcial de importe y referencia ausente. **No certifica una anulación fiscal**.
+- Reportes de compras y ventas por período en PDF, CSV y Excel, comparación mensual y CSV de contrapartes (proveedores/clientes).
+
+**Etapa D — Hacienda, auditoría y automatización**
+
+- Importación local de XML **MensajeHacienda** (respuesta de aceptación/rechazo), vinculados por clave a los comprobantes del perfil. La aplicación **no** verifica firmas XAdES ni consulta el estado en línea, por lo que el estado visual indica lo informado en el archivo.
+- **Bitácora** con fecha, acción, empresa y detalles de la operación, guardada en SQLite.
+- **Carpetas vigiladas**: elegir una carpeta en Windows y revisar XML nuevos mientras la aplicación permanece abierta. Los archivos detectados se ofrecen a la misma vista previa; **nunca se importan automáticamente sin confirmación**. No se examinan subcarpetas.
+
+### Limitaciones y comprobaciones necesarias
+
+- Los resultados y reportes son auxiliares: requieren revisión contable para declaración de IVA, exoneraciones y la naturaleza de documentos de compra o pago.
+- Las respuestas de Hacienda importadas **no están verificadas criptográficamente**, y su presencia no implica una consulta oficial en tiempo real.
+- Las pruebas integrales con `better-sqlite3` nativo, `xml2js`, Electron, Playwright y el instalador NSIS deben ejecutarse en Windows o GitHub Actions después de instalar dependencias.
+- El repositorio no incluye XML reales con datos fiscales; usa únicamente casos de prueba sintéticos.
+
+### Cómo probar los nuevos apartados
+
+1. Registra dos empresas con cédulas distintas y prepara XML sintéticos para cada una.
+2. Revisa **Importación inteligente**: la empresa sugerida, duplicados, confirmación y deshacer un lote.
+3. Consulta **Compras y ventas** y exporta PDF/CSV/Excel; confirma que las notas de crédito resten.
+4. Importa un **MensajeHacienda** sintético y comprueba que aparezca solo en la empresa con la clave correspondiente.
+5. Comprueba la **Bitácora** después de importar y mover documentos.
+6. Configura una **Carpeta vigilada** y verifica que sus XML no entren sin revisión.
+7. Crea un respaldo, verifica su integridad y ensaya la restauración **en una base de prueba**, nunca por primera vez sobre el historial de producción.
 
 ## Tecnologías
 
@@ -83,7 +129,7 @@ npm run dist:win
 El instalador se guardará en:
 
 ```text
-release/ComprobantesElectronicosCR-Setup-1.3.6-x64.exe
+release/ComprobantesElectronicosCR-Setup-1.4.0-x64.exe
 ```
 
 El identificador interno es `cr.comprobanteselectronicoscr.desktop`; **no** es el identificador de FacturaCR. El instalador no está firmado digitalmente. Windows SmartScreen puede advertir sobre un editor desconocido.
@@ -92,11 +138,11 @@ El identificador interno es `cr.comprobanteselectronicoscr.desktop`; **no** es e
 
 1. Abre **Empresas** y crea el perfil de la empresa que quieres administrar.
 2. Selecciónala en el menú lateral. Si registraste una cédula, los XML deben corresponder a su emisor o receptor.
-3. Presiona **Importar XML** y selecciona los archivos. Los duplicados se identifican dentro del perfil.
+3. En **Importación inteligente**, selecciona hasta 10 XML por revisión, comprueba la empresa sugerida y confirma los documentos que quieres guardar. Los duplicados se identifican antes de confirmar. Puedes deshacer el último lote desde ese mismo apartado.
 4. Consulta **Panel general** y configura el período para las estadísticas.
 5. En **Comprobantes**, busca por clave, comercio, fechas o tipo de documento.
 6. En **Reportes y exportaciones**, elige PDF, CSV o Excel para la empresa y filtros actuales.
-7. En **Respaldos automáticos**, revisa la configuración y crea una copia antes de cambios importantes.
+7. En **Respaldos automáticos**, revisa la configuración, valida un archivo SQLite antes de restaurarlo y crea copias antes de cambios importantes.
 
 ### Moneda y tipo de cambio
 
@@ -198,3 +244,47 @@ Al subir la carpeta completa a un repositorio privado:
 **Versión 1.3.6 — QA y CI:** incluye infraestructura de pruebas y documentación renovada. No debe considerarse listo para uso contable hasta completar las pruebas reales del ejecutable en Windows, revisar sus informes y validar muestras de XML propias en un ambiente de pruebas.
 
 Documentación complementaria: [`QA_PLAN.md`](QA_PLAN.md) · [`README_XML_4_4.md`](README_XML_4_4.md).
+
+## Diagnóstico de `ImpuestoNeto` (v1.3.7)
+
+Si Hacienda 4.4 trae líneas donde `ImpuestoNeto` difiere de la suma de `Impuesto.Monto`, revise primero exoneraciones, impuesto asumido por el emisor y desglose `DetalleSurtido`. La aplicación contempla la precisión real de los decimales y muestra cantidades en los errores sin modificar automáticamente diferencias materiales.
+
+Para ver las diferencias localmente (sin enviar XML a terceros):
+
+```powershell
+npm run qa:diagnosticar-iva -- "C:\Facturas\archivo.xml"
+```
+
+En caso de persistir el problema, revise el XML completo antes de decidir qué monto contable debe prevalecer. El programa no sustituye una validación tributaria ante Hacienda.
+
+
+## Conciliación fiscal de XML 4.4 — versión 1.3.9
+
+Algunos emisores declaran `ImpuestoAsumidoEmisorFabrica` como `.00` o `.000`, formas decimales que el parser ahora reconoce. También existen diferencias pequeñas entre `Impuesto.Monto` e `ImpuestoNeto` por redondeo de cinco a dos decimales.
+
+- Se admite una discrepancia **microscópica** (hasta 0.0001 CRC) con el IVA neto declarado.
+- Un ajuste de **hasta un céntimo** solo se admite con **un único impuesto**, cuando concuerda con `MontoTotalLinea - SubTotal` y, adicionalmente, coincide el impuesto expresado en céntimos o el cálculo de base imponible × tarifa (también en céntimos).
+- Se conserva el IVA bruto original y se utiliza `ImpuestoNeto` para el IVA contable. El ajuste aceptado se registra como observación de importación.
+- Las discrepancias superiores a un céntimo, las que no se puedan conciliar, y las diferencias ambiguas entre varios impuestos siguen provocando error.
+- Los archivos XML nunca se reescriben. **La aceptación de importación no garantiza la validez tributaria del documento ante Hacienda**.
+
+Para probar exclusivamente las regresiones de redondeo:
+
+```powershell
+node --test tests/qa-redondeos-reales-xml44.test.cjs
+```
+
+Para diagnosticar localmente un XML sin subirlo a GitHub:
+
+```powershell
+npm run qa:diagnosticar-iva -- "C:\Ruta\Factura.xml"
+```
+
+Los ocho XML aportados durante el diagnóstico **no se incluyen en el proyecto ni en GitHub**. Se reemplazaron por pruebas sintéticas que contienen únicamente montos y estructuras de ejemplo. Consulta [`CAMBIOS_v1.3.9_CORRECCIONES_XML_REALES.md`](CAMBIOS_v1.3.9_CORRECCIONES_XML_REALES.md) y [`INFORME_QA_v1.3.9.md`](INFORME_QA_v1.3.9.md).
+
+
+## Corregir facturas importadas en la empresa equivocada (v1.3.9)
+
+En **Comprobantes**, usa las casillas de cada fila para elegir uno o varios XML y selecciona **Mover seleccionados** hacia la empresa correcta, o **Enviar a Papelera** para retirarlos del historial y los reportes sin perder los archivos. Se crea una copia SQLite antes de modificar registros.
+
+En la nueva sección **Papelera**, selecciona documentos y una empresa destino para **Restaurar seleccionados**. La restauración comprueba cédulas y duplicados; si falla un comprobante, no cambia ninguno del lote. El XML original se conserva. Más información en `CAMBIOS_v1.3.9_PAPELERA_RESTAURACION.md`.

@@ -214,3 +214,36 @@ export function pdfDetalle(perfil,f) {
     y+10,{styles:{fontSize:7,cellPadding:2.2}});
   cerrarPDF(pdf,`Comprobante_${nombreSeguro(f.consecutivo||f.clave||f.id)}.pdf`);
 }
+
+// v1.4.0: clasificación por papel real de la empresa, nunca solo por tipo XML.
+import {clasificacion,tablaContable,agruparContrapartes,compararMeses} from './contabilidad.mjs';
+export function csvComprasVentas(perfil,docs) {
+  descargarCSV(`Compras_Ventas_${sufijo(perfil)}.csv`,
+    ['Empresa','Movimiento','Tipo XML','Fecha','Clave','Emisor','Receptor','Total neto CRC','IVA neto CRC'],
+    docs.map(f=>[perfil.nombre,clasificacion(f,perfil),f.tipoDocumento,fechaCorta(f.fecha),f.clave,
+      f.emisor?.nombre||'',f.receptor?.nombre||'',csvMonto(f.total),
+      csvMonto((f.impuestos||[]).filter(i=>i.codigo==='01').reduce((n,i)=>n+numero(i.monto),0))]));
+}
+export function excelComprasVentas(perfil,docs) {
+  descargarExcel(`Compras_Ventas_${sufijo(perfil)}.xlsx`,'Compras y ventas',
+    ['Movimiento','Tipo XML','Fecha','Clave','Emisor','Receptor','Total CRC','IVA CRC'],
+    docs.map(f=>[clasificacion(f,perfil),f.tipoDocumento,fechaCorta(f.fecha),f.clave,f.emisor?.nombre||'',
+      f.receptor?.nombre||'',numero(f.total),(f.impuestos||[]).filter(i=>i.codigo==='01').reduce((n,i)=>n+numero(i.monto),0)]),[6,7]);
+}
+export function pdfComprasVentas(perfil,docs) {
+  const pdf=nuevaHojaPDF(perfil,'Compras y ventas','Clasificación según cédula de emisor y receptor; importes con signo');
+  tablaPDF(pdf,['Clasificación','Documentos','Total neto CRC','Base neta CRC','IVA neto CRC'],
+    tablaContable(perfil,docs).map(r=>[r.tipo,String(r.cantidad),crcPdf(r.total),crcPdf(r.base),crcPdf(r.iva)]),56);
+  cerrarPDF(pdf,`Compras_Ventas_${sufijo(perfil)}.pdf`);
+}
+
+export function csvContrapartes(perfil,docs) {
+ descargarCSV(`Contrapartes_${sufijo(perfil)}.csv`,
+ ['Movimiento','Proveedor / cliente','Documentos','Total neto CRC','IVA neto CRC'],
+ agruparContrapartes(perfil,docs).map(r=>[r.tipo,r.nombre,r.cantidad,csvMonto(r.total),csvMonto(r.iva)]));
+}
+export function csvComparativoMensual(perfil,docs) {
+ descargarCSV(`Comparativo_Mensual_${sufijo(perfil)}.csv`,
+ ['Mes','Compras netas CRC','Ventas netas CRC','Diferencia CRC'],
+ compararMeses(perfil,docs).map(r=>[r.mes,csvMonto(r.compras),csvMonto(r.ventas),csvMonto(r.ventas-r.compras)]));
+}

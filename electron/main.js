@@ -8,6 +8,11 @@ const {abrirBaseDatos} = require('../backend/database');
 const {crearAPI} = require('../backend/server');
 const {crearServicioTipoCambio} = require('../backend/tipo-cambio');
 const {parsearXML, procesarDocumento, identificarDocumento, datosMonedaDocumento} = require('../backend/parser');
+const {previsualizarXML} = require('../backend/previsualizacion');
+const {leerMensajeHacienda,resumenComprasVentas,analizarReferencias} = require('../backend/gestion');
+const {crearVigilancia} = require('../backend/vigilancia');
+const {validarCopia,reemplazarBaseCerrada} = require('../backend/restauracion');
+const fs = require('node:fs');
 
 let ventana;
 let servidor;
@@ -17,6 +22,9 @@ let token;
 let gestorRespaldos;
 let servicioTipoCambio;
 let temporizadorRespaldos;
+let temporizadorVigilancia;
+let vigilancia;
+const preparadas=new Map(); // Solo en memoria durante 15 minutos. No se graban XML hasta confirmar.
 const devURL = process.env.VITE_DEV_SERVER_URL || null;
 
 // Identidad única: este programa NO debe actualizar ni reemplazar a FacturaCR.
@@ -50,6 +58,28 @@ async function peticionAPI(ruta, method='GET', body, headers={}) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || `Error HTTP ${response.status}`);
   return data;
+}
+
+function limpiarPrevisualizaciones(){
+  for(const [token,v] of preparadas)if(Date.now()-v.creada>15*60*1000)preparadas.delete(token);
+}
+async function prepararArchivos(archivos,perfilPreferido,idsVigilancia=[]) {
+  limpiarPrevisualizaciones();
+  if(preparadas.size>=6)preparadas.delete(preparadas.keys().next().value);
+  if(!Array.isArray(archivos)||archivos.length<1||archivos.length>10)throw new Error('Máximo 10 XML por vista previa');
+  let total=0;
+  const files=archivos.map(f=>{
+    if(typeof f.nombre!=='string'||!/\.xml$/i.test(f.nombre)||f.nombre.length>255)throw new Error('Solo archivos .xml con nombre válido');
+    const bytes=Buffer.from(f.bytes||[]);
+    if(!bytes.length||bytes.length>15*1024*1024)throw new Error('Archivo vacío o mayor de 15 MB');
+    total+=bytes.length;
+    return {nombre:f.nombre,bytes};
+  });
+  if(total>60*1024*1024)throw new Error('El lote supera 60 MB');
+  const vista=await previsualizarXML(files,base.perfiles(),base,servicioTipoCambio,perfilPreferido);
+  const tokenVista=crypto.randomUUID();
+  preparadas.set(tokenVista,{creada:Date.now(),contenidos:vista.contenidos,filas:vista.filas,idsVigilancia});
+  return {token:tokenVista,filas:vista.filas,limite:10};
 }
 
 function registrarPuente() {
@@ -108,6 +138,114 @@ function registrarPuente() {
     const actualizados=base.actualizarImpuestosHistoricos(nuevos);
     return {actualizados,respaldo:copia.ruta};
   });
+  ipcMain.handle('comprobanteselectronicoscr:previsualizar',async(e,perfilId,archivos)=>{
+    validarEmisor(e);return prepararArchivos(archivos,perfilId);
+  });
+  ipcMain.handle('comprobanteselectronicoscr:confirmar-importacion',async(e,tokenVista,selecciones)=>{
+    validarEmisor(e);limpiarPrevisualizaciones();
+    const vista=preparadas.get(tokenVista);
+    if(!vista)throw new Error('La vista previa expiró. Selecciona los archivos nuevamente.');
+    if(!Array.isArray(selecciones)||!selecciones.length||selecciones.length>10)throw new Error('Selecciona los comprobantes');
+    const vistos=new Set();
+    const items=selecciones.map(s=>{
+      if(!Number.isSafeInteger(s.indice)||vistos.has(s.indice))throw new Error('Documento repetido en la selección');
+      vistos.add(s.indice);
+      const fila=vista.filas[s.indice],cont=vista.contenidos[s.indice];
+      if(!fila||!cont||fila.estado==='error'||fila.estado==='duplicado_en_lote')throw new Error('El documento no pasó la revisión');
+      if(!Number.isSafeInteger(s.perfilId)||s.perfilId<=0)throw new Error('Selecciona una empresa por documento');
+      return {...cont,perfilId:s.perfilId};
+    });
+    // Agregar es atómico en SQLite. Evitamos el segundo clic con la misma vista.
+    preparadas.delete(tokenVista);
+    const resultado=base.importarLote(items);
+    if(vista.idsVigilancia.length)vigilancia.marcar(selecciones.map(x=>vista.idsVigilancia[x.indice]).filter(Boolean));
+    return resultado;
+  });
+  ipcMain.handle('comprobanteselectronicoscr:deshacer-importacion',async(e,id,confirmacion)=>{
+    validarEmisor(e);
+    if(confirmacion!=='DESHACER')throw new Error('Confirma escribiendo DESHACER');
+    const copia=await gestorRespaldos.crear('antes-eliminar');
+    return {...base.deshacerUltimoLote(id),respaldo:copia.ruta};
+  });
+  ipcMain.handle('comprobanteselectronicoscr:ultimo-lote',async e=>{
+    validarEmisor(e);return base.ultimoLote();
+  });
+  ipcMain.handle('comprobanteselectronicoscr:gestion-contable',async(e,perfilId)=>{
+    validarEmisor(e);
+    const perfil=base.perfil(perfilId),docs=base.listar(perfil.id);
+    return {resumen:resumenComprasVentas(docs,perfil),conciliaciones:analizarReferencias(docs)};
+  });
+  ipcMain.handle('comprobanteselectronicoscr:auditoria',async e=>{
+    validarEmisor(e);return base.historialAuditoria();
+  });
+  ipcMain.handle('comprobanteselectronicoscr:mensajes-hacienda',async(e,perfilId)=>{
+    validarEmisor(e);return base.mensajesHacienda(perfilId);
+  });
+  ipcMain.handle('comprobanteselectronicoscr:importar-mensajes',async(e,archivos)=>{
+    validarEmisor(e);
+    if(!Array.isArray(archivos)||archivos.length<1||archivos.length>10)throw new Error('Máximo 10 mensajes por importación');
+    let nuevos=0,duplicados=0;const errores=[];
+    for(const archivo of archivos){
+      try{
+        const bytes=Buffer.from(archivo.bytes||[]);
+        if(bytes.length<1||bytes.length>15*1024*1024)throw new Error('Archivo vacío o grande');
+        const mensaje=await leerMensajeHacienda(bytes.toString('utf8'),archivo.nombre);
+        if(base.registrarMensajeHacienda(mensaje))nuevos++;else duplicados++;
+      }catch(error){errores.push({archivo:archivo.nombre,error:error.message});}
+    }
+    return {nuevos,duplicados,errores};
+  });
+  ipcMain.handle('comprobanteselectronicoscr:vigilancia-estado',async e=>{
+    validarEmisor(e);return vigilancia.revisar();
+  });
+  ipcMain.handle('comprobanteselectronicoscr:vigilancia-configurar',async(e,habilitado)=>{
+    validarEmisor(e);
+    const seleccionado=await dialog.showOpenDialog(ventana,{title:'Seleccionar carpeta de XML',properties:['openDirectory']});
+    if(seleccionado.canceled||!seleccionado.filePaths[0])return vigilancia.estado();
+    return vigilancia.configurar(seleccionado.filePaths[0],habilitado===true);
+  });
+  ipcMain.handle('comprobanteselectronicoscr:vigilancia-habilitar',async(e,habilitado)=>{
+    validarEmisor(e);return vigilancia.configurar(null,habilitado===true);
+  });
+  ipcMain.handle('comprobanteselectronicoscr:vigilancia-previsualizar',async(e,perfilId,ids)=>{
+    validarEmisor(e);
+    const files=vigilancia.obtenerArchivos(ids);
+    return prepararArchivos(files,perfilId,ids);
+  });
+  ipcMain.handle('comprobanteselectronicoscr:respaldo-validar',async e=>{
+    validarEmisor(e);
+    const elegido=await dialog.showOpenDialog(ventana,{title:'Selecciona un respaldo SQLite para revisar',
+      filters:[{name:'SQLite',extensions:['sqlite','db']}],properties:['openFile']});
+    if(elegido.canceled||!elegido.filePaths[0])return {cancelado:true};
+    const ruta=elegido.filePaths[0];
+    const meta=validarCopia(ruta);
+    // Token interno: no aceptamos rutas elegidas por texto desde la interfaz.
+    const tokenRestauracion=crypto.randomUUID();
+    preparadas.set(tokenRestauracion,{tipo:'respaldo',ruta,creada:Date.now()});
+    return {token:tokenRestauracion,archivo:path.basename(ruta),...meta};
+  });
+  ipcMain.handle('comprobanteselectronicoscr:respaldo-restaurar',async(e,tokenRestauracion,frase)=>{
+    validarEmisor(e);
+    if(frase!=='RESTAURAR')throw new Error('Escribe RESTAURAR para confirmar');
+    const etapa=preparadas.get(tokenRestauracion);
+    if(etapa?.tipo!=='respaldo'||Date.now()-etapa.creada>15*60*1000)throw new Error('Selecciona nuevamente el respaldo');
+    validarCopia(etapa.ruta);
+    const copiaEmergencia=await gestorRespaldos.crear('antes-restaurar');
+    preparadas.delete(tokenRestauracion);
+    // Cerrar SQLite antes de reemplazar archivos; Electron reinicia el proceso
+    // para que la API no conserve una referencia a la conexión antigua.
+    await new Promise(resolve=>servidor?.close(resolve)||resolve());servidor=null;
+    base.cerrar();base=null;
+    try{
+      reemplazarBaseCerrada(etapa.ruta,rutaBaseDatos());
+      app.relaunch();app.quit();
+      return {reiniciando:true,respaldoEmergencia:copiaEmergencia.ruta};
+    }catch(error){
+      // Si no se pudo restaurar, reabrir solo después de reiniciar.
+      app.relaunch();app.quit();
+      throw new Error(`No se restauró: ${error.message}. Respaldo de emergencia: ${copiaEmergencia.ruta}`);
+    }
+  });
   ipcMain.handle('comprobanteselectronicoscr:perfiles',async e=>{
     validarEmisor(e);
     return peticionAPI('/api/perfiles');
@@ -157,10 +295,33 @@ function registrarPuente() {
     }
     return peticionAPI(`/api/perfiles/${perfilId}/importar`,'POST',form);
   });
+  ipcMain.handle('comprobanteselectronicoscr:papelera-listar',async e=>{
+    validarEmisor(e);return {documentos:base.listarPapelera()};
+  });
+  ipcMain.handle('comprobanteselectronicoscr:papelera-enviar',async(e,perfilId,ids)=>{
+    validarEmisor(e);
+    if(!idValido(perfilId) || !Array.isArray(ids)) throw new Error('Empresa o selección inválida');
+    // Si falla el respaldo verificado, no se mueve nada de los documentos activos.
+    const copia=await gestorRespaldos.crear('antes-eliminar');
+    return {...base.enviarPapelera(perfilId,ids),respaldo:copia.ruta};
+  });
+  ipcMain.handle('comprobanteselectronicoscr:papelera-restaurar',async(e,ids,destinoPerfilId)=>{
+    validarEmisor(e);
+    if(!Array.isArray(ids) || !idValido(destinoPerfilId)) throw new Error('Selección o destino inválido');
+    const copia=await gestorRespaldos.crear('antes-eliminar');
+    return {...base.restaurarPapelera(ids,destinoPerfilId),respaldo:copia.ruta};
+  });
+  ipcMain.handle('comprobanteselectronicoscr:mover-lote',async(e,perfilId,ids,destinoId)=>{
+    validarEmisor(e);
+    if(!idValido(perfilId) || !Array.isArray(ids) || !idValido(destinoId)) throw new Error('Empresa o destino inválido');
+    const copia=await gestorRespaldos.crear('antes-eliminar');
+    return {...base.moverLote(perfilId,ids,destinoId),respaldo:copia.ruta};
+  });
   ipcMain.handle('comprobanteselectronicoscr:eliminar',async(e,perfilId,id)=>{
     validarEmisor(e);
     if (!idValido(perfilId) || !idValido(id)) throw new Error('Identificadores inválidos');
-    return peticionAPI(`/api/perfiles/${perfilId}/documentos/${id}`,'DELETE');
+    const copia=await gestorRespaldos.crear('antes-eliminar');
+    return {...base.enviarPapelera(perfilId,[id]),respaldo:copia.ruta};
   });
   ipcMain.handle('comprobanteselectronicoscr:mover',async(e,perfilId,id,destinoId)=>{
     validarEmisor(e);
@@ -216,6 +377,10 @@ async function peticionJSON(ruta,method,datos) {
 
 async function iniciar() {
   base = abrirBaseDatos(rutaBaseDatos());
+  vigilancia=crearVigilancia(app.getPath('userData'));
+  vigilancia.revisar();
+  temporizadorVigilancia=setInterval(()=>vigilancia.revisar(),45*1000);
+  temporizadorVigilancia.unref?.();
   gestorRespaldos = crearGestorRespaldos({
     base,
     configuracionDir:app.getPath('userData'),
@@ -284,6 +449,7 @@ app.whenReady().then(iniciar).catch((e)=>{
 app.on('window-all-closed',()=>app.quit());
 app.on('before-quit',()=>{
   if (temporizadorRespaldos) clearInterval(temporizadorRespaldos);
+  if (temporizadorVigilancia) clearInterval(temporizadorVigilancia);
   if (servidor) servidor.close();
   if (base) {try {base.cerrar();} catch(e) { /* ya cerrada */ }}
 });

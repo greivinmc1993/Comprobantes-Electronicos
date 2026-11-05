@@ -78,7 +78,13 @@ function crearAPI(base, token, rutaFrontend, servicioTipoCambio) {
           // Se informa sin marcar el comprobante como rechazado.
           avisos.push({archivo:file.originalname,mensaje:`Se aplicó el cambio del XML: ${referencia.advertencia}`});
         }
-        if (base.insertar(xml,doc,perfil.id)) nuevos++; else duplicados++;
+        if (base.insertar(xml,doc,perfil.id)) {
+          nuevos++;
+          if (doc.observacionesFiscales?.length) {
+            avisos.push({archivo:file.originalname,
+              mensaje:`${doc.observacionesFiscales.length} línea(s) con redondeo fiscal conciliado; se conservaron los importes originales del XML.`});
+          }
+        } else duplicados++;
       } catch(e) {errores.push({archivo:file.originalname,mensaje:e.message});}
     }
     res.json({perfil:perfil.id,importacion:{nuevos,duplicados},errores,avisos});

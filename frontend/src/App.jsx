@@ -2,6 +2,8 @@ import React, {useEffect,useMemo,useRef,useState} from 'react';
 import {Bar,Doughnut} from 'react-chartjs-2';
 import 'chart.js/auto';
 import Icon from './components/Icon';
+import CentroGestion from './components/CentroGestion';
+import VistaPrevia from './components/VistaPrevia';
 import {
   TASAS,TIPOS,numero,crc,fechaCorta,resumenDatos,csvDocumentos,csvIVA,csvComercios,csvLineas,
   pdfResumen,pdfComercios,pdfIVA,pdfDetalle,excelDocumentos,excelIVA,excelComercios,excelLineas
@@ -14,6 +16,12 @@ const PALETA=['#2563EB','#0891B2','#0F766E','#7C3AED','#D97706','#DC5462'];
 const NAVEGACION=[
   {id:'inicio',titulo:'Panel general',icono:'grid'},
   {id:'documentos',titulo:'Comprobantes',icono:'receipt'},
+  {id:'importacion',titulo:'Importación inteligente',icono:'importar'},
+  {id:'contabilidad',titulo:'Compras y ventas',icono:'wallet'},
+  {id:'hacienda',titulo:'Mensajes Hacienda',icono:'shield'},
+  {id:'auditoria',titulo:'Bitácora',icono:'file'},
+  {id:'carpetas',titulo:'Carpetas vigiladas',icono:'folder'},
+  {id:'papelera',titulo:'Papelera',icono:'trash'},
   {id:'reportes',titulo:'Reportes y exportaciones',icono:'report'},
   {id:'perfiles',titulo:'Empresas',icono:'building'},
   {id:'respaldos',titulo:'Respaldos automáticos',icono:'database'},
@@ -46,11 +54,12 @@ function Campo({titulo,children}) {return <label className="campo"><span>{titulo
 function Boton({children,icono,clase='btn-primary',...props}) {
   return <button className={`btn ${clase}`} {...props}>{icono&&<Icon name={icono} size={17}/>}<span>{children}</span></button>;
 }
-function TablaComprobantes({docs,alSeleccionar,compacta=false}) {
+function TablaComprobantes({docs,alSeleccionar,compacta=false,marcados=[],alMarcar,alMarcarPagina}) {
   if(!docs.length) return <Vacio titulo="No se encontraron comprobantes" descripcion="Prueba con otros filtros o importa documentos XML para esta empresa."/>;
   return <div className="table-scroll"><table className="data-table">
-    <thead><tr><th>Documento</th><th>Emisor / Receptor</th><th>Fecha</th><th>Consecutivo</th><th className="numero-tabla">Total neto</th><th aria-label="Detalle"/></tr></thead>
-    <tbody>{docs.map(f=><tr key={f.id} onClick={()=>alSeleccionar(f)} className="fila-interactiva" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter') alSeleccionar(f);}}>
+    <thead><tr>{alMarcar&&<th className="col-seleccion"><input type="checkbox" aria-label="Seleccionar comprobantes de esta página" checked={docs.length>0&&docs.every(f=>marcados.includes(f.id))} onChange={e=>alMarcarPagina(docs.map(f=>f.id),e.target.checked)}/></th>}<th>Documento</th><th>Emisor / Receptor</th><th>Fecha</th><th>Consecutivo</th><th className="numero-tabla">Total neto</th><th aria-label="Detalle"/></tr></thead>
+    <tbody>{docs.map(f=><tr key={f.id} onClick={()=>alSeleccionar(f)} className="fila-interactiva" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'&&e.target===e.currentTarget) alSeleccionar(f);}}>
+      {alMarcar&&<td className="col-seleccion" onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={`Seleccionar comprobante ${f.consecutivo||f.clave||f.id}`} checked={marcados.includes(f.id)} onChange={e=>alMarcar(f.id,e.target.checked)}/></td>}
       <td><span className={cssTipo(f.tipoDocumento)}>{rotuloTipo(f.tipoDocumento)}</span><small className="texto-secundario bloque">{f.versionXML?`XML ${f.versionXML}`:'XML'}</small></td>
       <td className="celda-negocio"><strong title={f.emisor?.nombre||f.comercio}>{f.emisor?.nombre||f.comercio||'Emisor no identificado'}</strong><small title={f.receptor?.nombre||''}>{f.receptor?.nombre||'Receptor no identificado'}</small></td>
       <td className="no-wrap">{fechaCorta(f.fecha)}</td>
@@ -161,6 +170,13 @@ export default function App() {
   const [cargando,setCargando]=useState(false);
   const [aviso,setAviso]=useState(null);
   const [seleccionado,setSeleccionado]=useState(null);
+  const [marcados,setMarcados]=useState([]);
+  const [marcadosPapelera,setMarcadosPapelera]=useState([]);
+  const [papelera,setPapelera]=useState([]);
+  const [destinoLote,setDestinoLote]=useState('');
+  const [destinoPapelera,setDestinoPapelera]=useState('');
+  const [operacionLote,setOperacionLote]=useState(null);
+  const [confirmacionLote,setConfirmacionLote]=useState('');
   const [modalPerfil,setModalPerfil]=useState(null);
   const [empresaEliminar,setEmpresaEliminar]=useState(null);
   const [nombreEliminar,setNombreEliminar]=useState('');
@@ -183,6 +199,10 @@ export default function App() {
   const [formPerfil,setFormPerfil]=useState(PERFIL_VACIO);
   const [destinoId,setDestinoId]=useState('');
   const [erroresImportacion,setErroresImportacion]=useState([]);
+  const [vistaImportacion,setVistaImportacion]=useState(null);
+  const [colaPendiente,setColaPendiente]=useState([]);
+  const [respaldoParaRestaurar,setRespaldoParaRestaurar]=useState(null);
+  const [confirmarRestauracion,setConfirmarRestauracion]=useState('');
   const [textoBuscar,setTextoBuscar]=useState('');
   const [filtroTipo,setFiltroTipo]=useState('TODOS');
   const [filtroComercio,setFiltroComercio]=useState('TODOS');
@@ -208,6 +228,18 @@ export default function App() {
     setDatos(resp);return resp;
   };
 
+  const recargarPapelera=async()=>{
+    if(!desktop) return [];
+    const res=await desktop.listarPapelera();
+    const items=res.documentos||[];
+    setPapelera(items);
+    setMarcadosPapelera(m=>m.filter(id=>items.some(d=>d.id===id)));
+    return items;
+  };
+  useEffect(()=>{
+    if(seccion==='papelera' && desktop) recargarPapelera().catch(err=>mensaje(err.message,'error'));
+  },[seccion]);
+
   useEffect(()=>{
     let vivo=true;
     async function inicio() {
@@ -227,6 +259,7 @@ export default function App() {
   useEffect(()=>{
     let vivo=true;
     setDatos({facturas:[]});setSeleccionado(null);setPagina(1);
+    setMarcados([]);setDestinoLote('');
     setTextoBuscar('');setFiltroTipo('TODOS');setFiltroComercio('TODOS');setFiltroIVA('TODOS');setDesde('');setHasta('');
     if(desktop && Number.isSafeInteger(perfilId) && perfilId>0) desktop.listar(perfilId).then(res=>{if(vivo) setDatos(res);}).catch(err=>{if(vivo) mensaje(err.message,'error');});
     return()=>{vivo=false;};
@@ -258,28 +291,53 @@ export default function App() {
   const comerciosDisponibles=[...new Set(todos.map(f=>f.emisor?.nombre||f.comercio).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   const limpiar=()=>{setTextoBuscar('');setFiltroTipo('TODOS');setFiltroComercio('TODOS');setFiltroIVA('TODOS');setDesde('');setHasta('');setPagina(1);};
 
+  const prepararVista=async(files)=>{
+    if(!files.length)return;
+    setCargando(true);
+    try{
+      const lote=await Promise.all(files.slice(0,10).map(async f=>({nombre:f.name,bytes:new Uint8Array(await f.arrayBuffer())})));
+      const resultado=await desktop.previsualizar(perfilId,lote);
+      setVistaImportacion(resultado);
+      setSeccion('importacion');
+    }catch(error){mensaje(`Vista previa: ${error.message}`,'error');}
+    finally{setCargando(false);}
+  };
   const importar=async e=>{
     const files=[...(e.target.files||[])];e.target.value='';
-    if(!files.length) return;
-    if(!perfilId) return mensaje('Crea y selecciona una empresa antes de importar documentos.','warn');
-    if(!desktop) return mensaje('No hay conexión con Electron.','error');
-    setCargando(true);setErroresImportacion([]);setAvisosCambio([]);
-    let nuevos=0,duplicados=0;const errores=[],avisos=[];
-    try {
-      for(let pos=0;pos<files.length;pos+=10) {
-        mensaje(`Importando ${Math.min(pos+10,files.length)} de ${files.length} archivo(s)…`);
-        const lote=await Promise.all(files.slice(pos,pos+10).map(async f=>({nombre:f.name,bytes:new Uint8Array(await f.arrayBuffer())})));
-        const resp=await desktop.importar(perfilId,lote);
-        nuevos+=resp.importacion?.nuevos||0;
-        duplicados+=resp.importacion?.duplicados||0;
-        errores.push(...(resp.errores||[]));
-        avisos.push(...(resp.avisos||[]));
-      }
+    if(!files.length)return;
+    if(!perfiles.length)return mensaje('Primero registra una empresa.','warn');
+    setColaPendiente(files.slice(10));
+    if(files.length>10)mensaje(`Se revisarán los primeros 10 XML. Quedan ${files.length-10} para el siguiente lote.`, 'warn');
+    await prepararVista(files.slice(0,10));
+  };
+  const confirmarImportacionInteligente=async selecciones=>{
+    if(!vistaImportacion||!desktop)return;
+    setCargando(true);
+    try{
+      const r=await desktop.confirmarImportacion(vistaImportacion.token,selecciones);
+      setVistaImportacion(null);
       await recargar();await recuperarPerfiles();
-      setErroresImportacion(errores);setAvisosCambio(avisos);
-      mensaje(`Importación: ${nuevos} nuevo(s), ${duplicados} duplicado(s), ${errores.length} con error${avisos.length?`, ${avisos.length} con tasa XML sin verificación en línea`:''}.`,errores.length||avisos.length?'warn':'ok');
-    } catch(err) {mensaje(`No se completó la importación: ${err.message}`,'error');}
-    finally {setCargando(false);}
+      mensaje(`Lote #${r.loteId}: ${r.nuevos} nuevo(s), ${r.duplicados} duplicado(s). Puedes deshacerlo en Importación inteligente.`);
+      if(colaPendiente.length){
+        const siguiente=colaPendiente.slice(0,10);
+        setColaPendiente(v=>v.slice(10));
+        // La siguiente vista previa exige su propia confirmación.
+        await prepararVista(siguiente);
+      }
+    }catch(error){mensaje(`No se guardó el lote: ${error.message}`,'error');setVistaImportacion(null);}
+    finally{setCargando(false);}
+  };
+  const elegirRespaldo=async()=>{
+    try{const r=await desktop.validarRespaldo();if(!r?.cancelado){setRespaldoParaRestaurar(r);setConfirmarRestauracion('');}}
+    catch(error){mensaje(`Respaldo inválido: ${error.message}`,'error');}
+  };
+  const restaurarCopia=async()=>{
+    if(!respaldoParaRestaurar||confirmarRestauracion!=='RESTAURAR')return;
+    setTrabajandoRespaldo(true);
+    try{await desktop.restaurarRespaldo(respaldoParaRestaurar.token,confirmarRestauracion);
+      mensaje('El programa se reiniciará con la base restaurada.');setRespaldoParaRestaurar(null);
+    }catch(error){mensaje(`No se pudo restaurar: ${error.message}`,'error');}
+    finally{setTrabajandoRespaldo(false);}
   };
 
   const cargarTipoCambio=async(forzar=false)=>{
@@ -393,10 +451,50 @@ export default function App() {
     finally{setCargando(false);}
   };
   const borrarDocumento=async f=>{
-    if(!window.confirm(`¿Eliminar el comprobante ${f.consecutivo||f.clave} de la empresa «${perfil.nombre}»? Esta acción requiere un respaldo para recuperarse.`))return;
+    if(!window.confirm(`¿Enviar el comprobante ${f.consecutivo||f.clave||f.id} de «${perfil.nombre}» a la Papelera? Podrás restaurarlo después. Se generará un respaldo previo.`))return;
     setCargando(true);
-    try {await desktop.eliminar(perfilId,f.id);await recargar();await recuperarPerfiles();setSeleccionado(null);mensaje('Comprobante eliminado.');}
-    catch(err){mensaje(err.message,'error');}finally{setCargando(false);}
+    try {
+      await desktop.enviarPapelera(perfilId,[f.id]);
+      await recargar();await recuperarPerfiles();setMarcados(m=>m.filter(id=>id!==f.id));
+      setSeleccionado(null);mensaje('Comprobante enviado a la Papelera. Puedes recuperarlo desde el menú lateral.');
+    } catch(err){mensaje(`No se modificó el documento: ${err.message}`,'error');}
+    finally{setCargando(false);}
+  };
+  const marcar=(id,checked)=>setMarcados(actual=>checked?[...new Set([...actual,id])]:actual.filter(x=>x!==id));
+  const marcarPagina=(ids,checked)=>setMarcados(actual=>checked?[...new Set([...actual,...ids])]:actual.filter(id=>!ids.includes(id)));
+  const abrirOperacionLote=tipo=>{
+    const ids=marcados.filter(id=>todos.some(f=>f.id===id));
+    if(!ids.length) return mensaje('Marca al menos un comprobante.','warn');
+    if(tipo==='mover' && !Number(destinoLote)) return mensaje('Selecciona la empresa destino.','warn');
+    setConfirmacionLote('');setOperacionLote({tipo,ids,perfilId,destinoId:Number(destinoLote)});
+  };
+  const ejecutarOperacionLote=async e=>{
+    e.preventDefault();
+    const op=operacionLote;
+    if(!op||confirmacionLote!=='CONFIRMAR'||op.perfilId!==perfilId)return;
+    setCargando(true);
+    try {
+      const resultado=op.tipo==='papelera'
+        ?await desktop.enviarPapelera(op.perfilId,op.ids)
+        :await desktop.moverLote(op.perfilId,op.ids,op.destinoId);
+      await recargar();await recuperarPerfiles();
+      setMarcados([]);setOperacionLote(null);setConfirmacionLote('');
+      mensaje(`${op.ids.length} comprobantes ${op.tipo==='papelera'?'enviados a la Papelera':'trasladados correctamente'}. Respaldo previo: ${resultado.respaldo}`);
+    } catch(err){mensaje(`Operación cancelada sin cambios: ${err.message}`,'error');}
+    finally{setCargando(false);}
+  };
+  const restaurarSeleccionados=async()=>{
+    const ids=marcadosPapelera.filter(id=>papelera.some(x=>x.id===id));
+    const destino=Number(destinoPapelera);
+    if(!ids.length || !destino) return mensaje('Selecciona documentos de la Papelera y una empresa destino.','warn');
+    if(!window.confirm(`¿Restaurar ${ids.length} comprobante(s) en «${perfiles.find(p=>p.id===destino)?.nombre}»? Se verificará la cédula y que no haya duplicados. Se creará respaldo.`))return;
+    setCargando(true);
+    try {
+      const res=await desktop.restaurarPapelera(ids,destino);
+      setMarcadosPapelera([]);await recargarPapelera();await recargar();await recuperarPerfiles();
+      mensaje(`${res.restaurados} comprobante(s) restaurados en la empresa seleccionada.`);
+    } catch(err){mensaje(`No se restauró ningún comprobante: ${err.message}`,'error');}
+    finally{setCargando(false);}
   };
   const moverDocumento=async()=>{
     const dest=Number(destinoId);
@@ -442,14 +540,14 @@ export default function App() {
       <nav className="nav-list" aria-label="Secciones">
         {NAVEGACION.map(n=><button key={n.id} className={`nav-item ${seccion===n.id?'nav-activo':''}`} onClick={()=>setSeccion(n.id)}><Icon name={n.icono} size={19}/><span>{n.titulo}</span>{n.id==='documentos'&&<span className="nav-count">{todos.length}</span>}</button>)}
       </nav>
-      <div className="sidebar-bottom"><div className="sidebar-card"><Icon name="shield" size={21}/><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div><button className="sidebar-backup" onClick={respaldo} disabled={cargando}><Icon name="database" size={18}/> Respaldar base SQLite</button><span className="app-version">ComprobantesElectronicosCR · v1.3.6</span></div>
+      <div className="sidebar-bottom"><div className="sidebar-card"><Icon name="shield" size={21}/><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div><button className="sidebar-backup" onClick={respaldo} disabled={cargando}><Icon name="database" size={18}/> Respaldar base SQLite</button><span className="app-version">ComprobantesElectronicosCR · v1.4.0</span></div>
     </aside>
 
     <div className="workspace">
       <header className="topbar"><div className="migas"><span>ComprobantesElectronicosCR</span><Icon name="chevron" size={13}/><strong>{NAVEGACION.find(n=>n.id===seccion)?.titulo}</strong></div><div className="topbar-right"><span className="local-status"><i/> Base de datos local</span><div className="top-avatar" style={{background:perfil.color}}>{perfil.nombre.slice(0,1).toUpperCase()}</div></div></header>
       <main className="main-content">
-        <div className="page-top"><div><div className="eyebrow">GESTIÓN DE COMPROBANTES · COSTA RICA</div><h1>{seccion==='inicio'?'Panel general':seccion==='documentos'?'Comprobantes':seccion==='reportes'?'Centro de reportes':seccion==='respaldos'?'Copias de seguridad':seccion==='divisas'?'Tipo de cambio USD':'Perfiles de empresas'}</h1><p>{seccion==='inicio'?'Una vista clara de la facturación y los impuestos de tu empresa.':seccion==='documentos'?'Consulta, filtra y organiza tus archivos electrónicos XML 4.4.':seccion==='reportes'?'Exportaciones con filtros, desglose de IVA y datos en colones.':seccion==='respaldos'?'Protege el historial SQLite de todas tus empresas con copias locales.':seccion==='divisas'?'Referencia oficial BCCR publicada por Hacienda; importes históricos guardados por fecha.':'Administra los documentos de cada empresa por separado.'}</p></div><div className="page-actions">{seccion==='perfiles'?<Boton icono="plus" onClick={()=>abrirPerfil()}>Nueva empresa</Boton>:seccion==='respaldos'?<Boton icono="database" onClick={crearRespaldoAhora} disabled={trabajandoRespaldo}>{trabajandoRespaldo?'Creando copia...':'Crear respaldo ahora'}</Boton>:<><Boton clase="btn-light" icono="exportar" title="Ir a los reportes para exportar archivos" onClick={()=>seccion==='inicio'?abrirDesdePanel('reportes'):setSeccion('reportes')}>Exportar</Boton><Boton icono="importar" title="Importar comprobantes XML a la empresa activa" onClick={()=>fileInput.current?.click()} disabled={cargando||!perfilId}>{cargando?'Procesando...':'Importar XML'}</Boton></>}</div></div>
-        {avisosCambio.length>0&&<div className="alerta aviso-warn" role="status"><Icon name="alert" size={18}/><span>{avisosCambio.length} documento(s) USD usaron la cotización declarada en el XML al no poder verificar Hacienda. <button className="text-button" onClick={()=>setAvisosCambio([])}>Cerrar</button></span></div>}
+        <div className="page-top"><div><div className="eyebrow">GESTIÓN DE COMPROBANTES · COSTA RICA</div><h1>{seccion==='inicio'?'Panel general':seccion==='documentos'?'Comprobantes':seccion==='papelera'?'Papelera de comprobantes':seccion==='importacion'?'Importación inteligente':seccion==='contabilidad'?'Centro contable':seccion==='hacienda'?'Mensajes de Hacienda':seccion==='auditoria'?'Bitácora de operaciones':seccion==='carpetas'?'Carpetas vigiladas':seccion==='reportes'?'Centro de reportes':seccion==='respaldos'?'Copias de seguridad':seccion==='divisas'?'Tipo de cambio USD':'Perfiles de empresas'}</h1><p>{seccion==='inicio'?'Una vista clara de la facturación y los impuestos de tu empresa.':seccion==='documentos'?'Consulta, filtra y organiza tus archivos electrónicos XML 4.4.':seccion==='papelera'?'Recupera importaciones retiradas del historial, sin alterar las otras empresas.':['importacion','contabilidad','hacienda','auditoria','carpetas'].includes(seccion)?'Herramientas de revisión, trazabilidad y control de comprobantes.':seccion==='reportes'?'Exportaciones con filtros, desglose de IVA y datos en colones.':seccion==='respaldos'?'Protege el historial SQLite de todas tus empresas con copias locales.':seccion==='divisas'?'Referencia oficial BCCR publicada por Hacienda; importes históricos guardados por fecha.':'Administra los documentos de cada empresa por separado.'}</p></div><div className="page-actions">{seccion==='perfiles'?<Boton icono="plus" onClick={()=>abrirPerfil()}>Nueva empresa</Boton>:seccion==='papelera'?<Boton icono="refresh" clase="btn-light" onClick={()=>recargarPapelera()} disabled={cargando}>Actualizar papelera</Boton>:seccion==='respaldos'?<Boton icono="database" onClick={crearRespaldoAhora} disabled={trabajandoRespaldo}>{trabajandoRespaldo?'Creando copia...':'Crear respaldo ahora'}</Boton>:<><Boton clase="btn-light" icono="exportar" title="Ir a los reportes para exportar archivos" onClick={()=>seccion==='inicio'?abrirDesdePanel('reportes'):setSeccion('reportes')}>Exportar</Boton><Boton icono="importar" title="Importar comprobantes XML a la empresa activa" onClick={()=>fileInput.current?.click()} disabled={cargando||!perfilId}>{cargando?'Procesando...':'Importar XML'}</Boton></>}</div></div>
+        {avisosCambio.length>0&&<div className="alerta aviso-warn" role="status"><Icon name="alert" size={18}/><span>{avisosCambio.length} observación(es) de importación (tipo de cambio o redondeos fiscales). <details><summary>Ver detalles</summary><ul>{avisosCambio.map((aviso,i)=><li key={i}><strong>{aviso.archivo}</strong>: {aviso.mensaje}</li>)}</ul></details><button className="text-button" onClick={()=>setAvisosCambio([])}>Cerrar</button></span></div>}
         <input ref={fileInput} type="file" multiple accept=".xml,application/xml,text/xml" className="oculto" onChange={importar}/>
         {aviso&&<div className={`alerta aviso-${aviso.tipo||'ok'}`} role="status"><Icon name={aviso.tipo==='error'?'alert':'check'} size={18}/><span>{aviso.texto}</span><button title="Cerrar aviso" onClick={()=>setAviso(null)}><Icon name="close" size={16}/></button></div>}
         {erroresImportacion.length>0&&<details className="errores-xml"><summary>{erroresImportacion.length} archivo(s) no importados — ver detalles</summary><ul>{erroresImportacion.map((err,i)=><li key={i}><strong>{err.archivo}</strong>: {err.mensaje}</li>)}</ul></details>}
@@ -459,7 +557,7 @@ export default function App() {
             accion={<Boton icono="plus" onClick={()=>abrirPerfil()}>Crear primera empresa</Boton>}/>
         </section>}
 
-        {seccion!=='perfiles'&&seccion!=='respaldos'&&<section className="active-company"><span className="company-dot" style={{background:perfil.color}}/><div><strong>{perfil.nombre}</strong><span>{perfil.cedula?`Cédula ${perfil.cedula}`:'Perfil local · Identificación opcional'}</span></div><span className="chip-neutro"><Icon name="database" size={14}/> {todos.length} comprobantes guardados</span></section>}
+        {seccion!=='perfiles'&&seccion!=='respaldos'&&seccion!=='papelera'&&<section className="active-company"><span className="company-dot" style={{background:perfil.color}}/><div><strong>{perfil.nombre}</strong><span>{perfil.cedula?`Cédula ${perfil.cedula}`:'Perfil local · Identificación opcional'}</span></div><span className="chip-neutro"><Icon name="database" size={14}/> {todos.length} comprobantes guardados</span></section>}
 
         {seccion==='inicio'&&<>
           <section className="surface-card periodo-panel" aria-label="Filtrar estadísticas del panel general por fecha">
@@ -525,7 +623,43 @@ export default function App() {
           <Campo titulo="Hasta"><input type="date" value={hasta} min={desde||undefined} onChange={e=>{setHasta(e.target.value);setPagina(1);}}/></Campo>
         </div><div className="filtros-summary"><Icon name="info" size={14}/> {filtrados.length} comprobante(s) coinciden con los filtros. Las exportaciones respetan esta selección.</div></section>}
 
-        {seccion==='documentos'&&<section className="surface-card documentos-panel"><div className="section-head"><div><h2>Listado de comprobantes <span className="numero-gris">({filtrados.length})</span></h2><p>Haz clic en una fila para abrir el detalle completo.</p></div><div className="actions-inline"><Boton icono="download" clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(csvDocumentos)}>CSV</Boton><Boton icono="download" clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(excelDocumentos)}>Excel</Boton><Boton icono="download" clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(pdfResumen)}>PDF resumen</Boton></div></div><TablaComprobantes docs={docsPagina} alSeleccionar={abrirDetalle}/>{filtrados.length>TOTAL_PAGINA&&<div className="paginador"><span>Mostrando {(pagina-1)*TOTAL_PAGINA+1}–{Math.min(pagina*TOTAL_PAGINA,filtrados.length)} de {filtrados.length}</span><div><button disabled={pagina===1} onClick={()=>setPagina(p=>p-1)}>Anterior</button><strong>{pagina} / {totalPaginas}</strong><button disabled={pagina===totalPaginas} onClick={()=>setPagina(p=>p+1)}>Siguiente</button></div></div>}</section>}
+        {seccion==='documentos'&&<section className="surface-card documentos-panel"><div className="section-head"><div><h2>Listado de comprobantes <span className="numero-gris">({filtrados.length})</span></h2><p>Haz clic en una fila para abrir el detalle completo.</p></div><div className="actions-inline"><Boton icono="download" clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(csvDocumentos)}>CSV</Boton><Boton icono="download" clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(excelDocumentos)}>Excel</Boton><Boton icono="download" clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(pdfResumen)}>PDF resumen</Boton></div></div><div className="seleccion-lote" role="group" aria-label="Acciones para comprobantes seleccionados">
+          <div className="seleccion-info"><Icon name="check" size={17}/><strong>{marcados.length} seleccionados</strong><span>Marca las facturas equivocadas; también puedes buscar y filtrar antes de seleccionarlas.</span></div>
+          <div className="seleccion-acciones">
+            <Boton clase="btn-light" disabled={!marcados.length||cargando} onClick={()=>setMarcados([])}>Limpiar selección</Boton>
+            <select aria-label="Empresa destino para trasladar selección" value={destinoLote} onChange={e=>setDestinoLote(e.target.value)}>
+              <option value="">Empresa destino...</option>{perfiles.filter(p=>p.id!==perfilId).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select>
+            <Boton icono="transfer" clase="btn-light" disabled={!marcados.length||!destinoLote||cargando} onClick={()=>abrirOperacionLote('mover')}>Mover seleccionados</Boton>
+            <Boton icono="trash" clase="btn-danger-light" disabled={!marcados.length||cargando} onClick={()=>abrirOperacionLote('papelera')}>Enviar a Papelera</Boton>
+          </div>
+        </div>
+        <TablaComprobantes docs={docsPagina} alSeleccionar={abrirDetalle} marcados={marcados} alMarcar={marcar} alMarcarPagina={marcarPagina}/>{filtrados.length>TOTAL_PAGINA&&<div className="paginador"><span>Mostrando {(pagina-1)*TOTAL_PAGINA+1}–{Math.min(pagina*TOTAL_PAGINA,filtrados.length)} de {filtrados.length}</span><div><button disabled={pagina===1} onClick={()=>setPagina(p=>p-1)}>Anterior</button><strong>{pagina} / {totalPaginas}</strong><button disabled={pagina===totalPaginas} onClick={()=>setPagina(p=>p+1)}>Siguiente</button></div></div>}</section>}
+
+        {seccion==='papelera'&&<section className="surface-card papelera-panel">
+          <div className="section-head"><div><h2>Comprobantes en Papelera <span className="numero-gris">({papelera.length})</span></h2><p>Los documentos de esta lista no se incluyen en los informes ni gráficos. Conservan su XML y se pueden restaurar.</p></div></div>
+          <div className="info-note"><Icon name="shield" size={18}/><span>Restaurar verifica los comprobantes repetidos y la identificación de la empresa de destino. Si alguno falla, no se restaura ninguno del lote.</span></div>
+          {papelera.length===0?<Vacio icono="trash" titulo="Papelera vacía" descripcion="Cuando quites comprobantes importados por error, aparecerán aquí hasta que los restaures."/>:<>
+            <div className="seleccion-lote">
+              <label className="papelera-marcar"><input type="checkbox" aria-label="Seleccionar toda la Papelera" checked={marcadosPapelera.length===papelera.length} onChange={e=>setMarcadosPapelera(e.target.checked?papelera.map(x=>x.id):[])}/> Seleccionar todos ({papelera.length})</label>
+              <div className="seleccion-acciones"><strong>{marcadosPapelera.length} marcados</strong>
+                <select aria-label="Empresa para restaurar los comprobantes" value={destinoPapelera} onChange={e=>setDestinoPapelera(e.target.value)}><option value="">Restaurar en empresa...</option>{perfiles.map(x=><option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
+                <Boton icono="refresh" disabled={!marcadosPapelera.length||!destinoPapelera||cargando} onClick={restaurarSeleccionados}>Restaurar seleccionados</Boton>
+              </div>
+            </div>
+            <div className="table-scroll"><table className="data-table"><thead><tr><th className="col-seleccion" aria-label="Marcar"/><th>Comprobante</th><th>Empresa anterior</th><th>Eliminado</th><th>Total</th></tr></thead><tbody>
+              {papelera.map(d=><tr key={d.id}><td className="col-seleccion"><input type="checkbox" aria-label={`Seleccionar documento de la Papelera ${d.consecutivo||d.clave||d.id}`} checked={marcadosPapelera.includes(d.id)} onChange={e=>setMarcadosPapelera(actual=>e.target.checked?[...new Set([...actual,d.id])]:actual.filter(id=>id!==d.id))}/></td>
+                <td><strong>{d.nombreArchivo}</strong><small className="texto-secundario bloque">{d.tipoDocumento} · {d.consecutivo||d.clave||'Sin consecutivo'}</small></td>
+                <td>{d.perfilOriginalNombre}</td><td>{new Date(d.eliminadoEn).toLocaleString('es-CR')}</td><td className="numero-tabla importe">{crc(d.total)}</td></tr>)}
+            </tbody></table></div>
+          </>}
+        </section>}
+
+        {['importacion','contabilidad','hacienda','auditoria','carpetas'].includes(seccion)&&
+          <CentroGestion key={`${seccion}-${perfilId}`} tipo={seccion} desktop={desktop} perfil={perfil}
+            perfiles={perfiles} documentos={todos} abrirArchivos={()=>fileInput.current?.click()}
+            onVista={async vista=>{setVistaImportacion(vista);setSeccion('importacion');}}
+            mostrar={mensaje} actualizar={async()=>{await recargar();await recuperarPerfiles();}}/>}
 
         {seccion==='reportes'&&<>
           <div className="reports-intro"><div><span className="eyebrow">EXPORTACIONES PROFESIONALES</span><h2>Informes listos para usar</h2><p>Generados con los filtros actuales, separados por empresa y con importes normalizados a CRC.</p></div><span><Icon name="report" size={48}/></span></div>
@@ -599,12 +733,22 @@ export default function App() {
               </Boton>
             </div>
           </section>
+          <section className="surface-card backup-config qa-restore" style={{marginTop:20,padding:22}}>
+            <div className="section-head"><div><h2>Restaurar respaldo completo</h2><p>Valida una copia SQLite y sustituye la base local con confirmación reforzada.</p></div><Icon name="shield" size={22}/></div>
+            <div className="info-note"><Icon name="alert" size={18}/><span>La restauración reemplaza los perfiles, documentos, mensajes y registros actuales por los del archivo elegido. Antes se crea una copia de emergencia y el programa se reinicia. No mezcles bases de otras aplicaciones.</span></div>
+            <div className="qa-actions"><button className="btn btn-light" onClick={elegirRespaldo} disabled={trabajandoRespaldo}>Seleccionar y verificar SQLite</button></div>
+            {respaldoParaRestaurar&&<div className="qa-info"><strong>{respaldoParaRestaurar.archivo}</strong><span>{respaldoParaRestaurar.empresas} empresas · {respaldoParaRestaurar.documentos} comprobantes</span><label className="campo">Escribe RESTAURAR<input value={confirmarRestauracion} onChange={e=>setConfirmarRestauracion(e.target.value)} placeholder="RESTAURAR"/></label><div className="qa-actions"><button className="btn btn-danger-light" disabled={trabajandoRespaldo||confirmarRestauracion!=='RESTAURAR'} onClick={restaurarCopia}>Restaurar y reiniciar</button><button className="btn btn-light" onClick={()=>setRespaldoParaRestaurar(null)}>Cancelar</button></div></div>}
+          </section>
           <div className="info-note backup-info"><Icon name="info" size={18}/><span>Los respaldos automáticos solo se ejecutan con la aplicación abierta. La aplicación no sube datos por sí misma; evita carpetas sincronizadas si quieres copias exclusivamente locales. Una actualización no debe eliminar la base; conserva además una copia en un disco externo. Para recuperar una copia, conserva el archivo SQLite y sigue las instrucciones del README antes de sustituir una base.</span></div>
         </>}
 
         <footer className="footer"><span>ComprobantesElectronicosCR · Windows · XML 4.4</span><span><Icon name="shield" size={14}/> Datos locales · USD: referencia de venta BCCR/Hacienda por fecha</span></footer>
       </main>
     </div>
+
+    <VistaPrevia vista={vistaImportacion} perfiles={perfiles} cargando={cargando}
+      onCerrar={()=>{setVistaImportacion(null);setColaPendiente([]);}}
+      onConfirmar={confirmarImportacionInteligente}/>
 
     {seleccionado&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setSeleccionado(null);}}><aside className="detail-drawer" role="dialog" aria-modal="true" aria-label="Detalle de comprobante"><div className="drawer-header"><div><div className="eyebrow">DOCUMENTO ELECTRÓNICO</div><h2>Detalle del comprobante</h2><p>{seleccionado.tipoDocumento}</p></div><button className="icon-button" onClick={()=>setSeleccionado(null)} title="Cerrar"><Icon name="close" size={20}/></button></div><div className="drawer-body"><div className="detail-total"><span>Total neto · CRC</span><strong className={numero(seleccionado.total)<0?'negativo':''}>{crc(seleccionado.total)}</strong><small>{seleccionado.monedaOriginal==='USD'?`Importe original US$${numero(seleccionado.totalOriginal).toFixed(2)} · cambio aplicado ₡${numero(seleccionado.tipoCambioAplicado).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:5})} (${seleccionado.fechaTipoCambio||'fecha no indicada'})`: 'Documento expresado originalmente en colones'}</small></div>
       <h3 className="drawer-section-title">Información del comprobante</h3><div className="detail-grid">
@@ -613,7 +757,16 @@ export default function App() {
       <h3 className="drawer-section-title">Resumen monetario</h3><div className="money-lines">{[['Total de venta',seleccionado.resumen?.totalVenta],['Descuentos',seleccionado.resumen?.totalDescuentos],['Venta neta',seleccionado.resumen?.totalVentaNeta],['Impuestos',seleccionado.resumen?.totalImpuesto],['Total comprobante',seleccionado.total]].map(([k,v])=><div key={k}><span>{k}</span><strong>{crc(v)}</strong></div>)}</div>
       <h3 className="drawer-section-title">Artículos y servicios ({seleccionado.detalle?.length||0})</h3><div className="lineas-detalle">{(seleccionado.detalle||[]).slice(0,limiteLineas).map((l,i)=><div className="linea-card" key={i}><div><span className="linea-id">#{l.linea}</span><strong>{l.detalle||'Sin descripción'}</strong></div><small>CAByS: {l.codigoCABYS||l.codigo||'—'}</small><div className="linea-montos"><span>{l.cantidad} × {crc(l.precioUnitario)}</span><strong>{crc(l.montoTotalLinea)}</strong></div><small>IVA: {(l.impuestos||[]).map(x=>`${x.tarifa}%`).join(', ')||'No indicado'}</small></div>)}{!seleccionado.detalle?.length&&<p className="texto-secundario">Este documento no incluye líneas de detalle.</p>}{(seleccionado.detalle?.length||0)>limiteLineas&&<Boton clase="btn-light" onClick={()=>setLimiteLineas(n=>n+30)}>Mostrar 30 líneas más</Boton>}</div>
       <h3 className="drawer-section-title">Organización</h3><div className="mover-documento"><Campo titulo="Mover comprobante a otra empresa"><select value={destinoId} onChange={e=>setDestinoId(e.target.value)}><option value="">Seleccionar empresa destino</option>{perfiles.filter(p=>p.id!==perfilId).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}</select></Campo><Boton icono="transfer" clase="btn-light" disabled={!destinoId||cargando} onClick={moverDocumento}>Mover</Boton></div>
-      </div><div className="drawer-footer"><Boton icono="download" onClick={()=>{try{pdfDetalle(perfil,seleccionado);}catch(err){mensaje(err.message,'error');}}}>PDF detalle</Boton><Boton icono="trash" clase="btn-danger-light" disabled={cargando} onClick={()=>borrarDocumento(seleccionado)}>Eliminar</Boton></div></aside></div>}
+      </div><div className="drawer-footer"><Boton icono="download" onClick={()=>{try{pdfDetalle(perfil,seleccionado);}catch(err){mensaje(err.message,'error');}}}>PDF detalle</Boton><Boton icono="trash" clase="btn-danger-light" disabled={cargando} onClick={()=>borrarDocumento(seleccionado)}>Enviar a Papelera</Boton></div></aside></div>}
+
+    {operacionLote&&<div className="overlay modal-overlay"><form className="company-modal delete-company-modal" onSubmit={ejecutarOperacionLote} role="dialog" aria-modal="true" aria-label="Confirmar operación de comprobantes">
+      <div className="modal-head"><div><div className="eyebrow">CORREGIR IMPORTACIÓN</div><h2>{operacionLote.tipo==='papelera'?'Enviar a Papelera':'Mover comprobantes'}</h2><p>{operacionLote.ids.length} comprobante(s) seleccionados de «{perfil.nombre}».</p></div><button type="button" className="icon-button" disabled={cargando} onClick={()=>setOperacionLote(null)} aria-label="Cancelar"><Icon name="close" size={20}/></button></div>
+      <div className="modal-body"><div className="info-note"><Icon name="shield" size={18}/><span>Se creará un respaldo verificado antes de modificar SQLite. La operación será completa o no cambiará ningún comprobante.</span></div>
+        <p>{operacionLote.tipo==='papelera'?'Los comprobantes dejarán de sumar en el Panel general y los reportes, pero podrás recuperarlos desde Papelera.':`Los comprobantes se trasladarán a «${perfiles.find(p=>p.id===operacionLote.destinoId)?.nombre||'destino'}». Se validarán cédulas y duplicados.`}</p>
+        <div className="confirmar-archivos"><strong>Comprobantes seleccionados:</strong><ul>{operacionLote.ids.slice(0,12).map(id=>{const d=todos.find(f=>f.id===id);return <li key={id}>{d?.nombreArchivo||d?.consecutivo||`Documento ${id}`}</li>;})}</ul>{operacionLote.ids.length>12&&<small>Y {operacionLote.ids.length-12} documento(s) más.</small>}</div>
+        <Campo titulo="Escribe CONFIRMAR para continuar"><input autoFocus autoComplete="off" value={confirmacionLote} onChange={e=>setConfirmacionLote(e.target.value)} placeholder="CONFIRMAR"/></Campo>
+      </div><div className="modal-footer"><Boton clase="btn-light" type="button" disabled={cargando} onClick={()=>setOperacionLote(null)}>Cancelar</Boton><Boton icono={operacionLote.tipo==='papelera'?'trash':'transfer'} clase={operacionLote.tipo==='papelera'?'btn-danger':'btn-primary'} type="submit" disabled={cargando||confirmacionLote!=='CONFIRMAR'}>{cargando?'Procesando...':'Confirmar operación'}</Boton></div>
+    </form></div>}
 
     {empresaEliminar&&<div className="overlay modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget&&!cargando)setEmpresaEliminar(null);}}>
       <form className="company-modal delete-company-modal" onSubmit={borrarPerfil} role="dialog" aria-modal="true" aria-label="Confirmar eliminación de empresa">

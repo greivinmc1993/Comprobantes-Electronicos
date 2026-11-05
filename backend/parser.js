@@ -44,48 +44,146 @@ function monedaDocumento(doc, referencia=null) {
 function extraerIdentificacion(persona) { const id = persona?.Identificacion || {}; return { tipo: texto(id.Tipo), numero: texto(id.Numero || persona?.IdentificacionExtranjero) }; }
 function persona(p) { return { nombre: texto(p?.Nombre), nombreComercial: texto(p?.NombreComercial), identificacion: extraerIdentificacion(p), correo: texto(p?.CorreoElectronico) }; }
 /**
- * Impuesto.Monto es BRUTO en Hacienda 4.4. Para IVA a pagar se usa el NETO,
- * descontando exoneraciones e impuesto asumido por emisor/fábrica. Cuando
- * ImpuestoNeto de la línea difiere, se reconcilia solo si es inequívoco;
- * nunca se reparte a ciegas una diferencia entre impuestos diferentes.
+ * Los importes XML se publican hasta con 5 decimales, aunque algunos emisores
+ * redondean sus importes a 2. La tolerancia toma la precisión DECLARADA de
+ * cada operando, sin aceptar arbitrariamente diferencias de un colón.
+ */
+function decimalFiscal(v, etiqueta, linea) {
+  const original = texto(v);
+  if (original == null) return {valor:0, semiancho:0};
+  const cadena = original.trim();
+  if (!/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(cadena)) {
+    throw new Error(`${etiqueta} no es un decimal válido en línea ${linea}`);
+  }
+  const valor = Number(cadena);
+  if (!Number.isFinite(valor)) throw new Error(`${etiqueta} fuera de rango en línea ${linea}`);
+  const nDecimales = cadena.includes('.') ? cadena.split('.')[1].length : 0;
+  return {valor, semiancho: 0.5 * 10 ** (-nDecimales)};
+}
+
+/**
+ * Hacienda 4.4 permite desglose de impuestos en el surtido/paquete/combo.
+ * Allí los impuestos de componentes sustituyen al desglose normal de línea
+ * y no deben sumarse dos veces. Cada IVA mantiene su propia tarifa.
+ */
+function impuestosDeclaradosEnLinea(linea) {
+  const surtidos = asArray(linea.DetalleSurtido?.LineaDetalleSurtido || linea.DetalleSurtido?.LineaDetalle);
+  const impuestosSurtido = surtidos.flatMap((componente, indice) => asArray(componente.ImpuestoSurtido).map(i => ({
+    Codigo: i.CodigoImpuestoSurtido,
+    CodigoTarifaIVA: i.CodigoTarifaIVASurtido,
+    Tarifa: i.TarifaSurtido,
+    Monto: i.MontoImpuestoSurtido ?? i.MontolmpuestoSurtido,
+    Exoneracion: i.ExoneracionSurtido ?? i.Exoneracion,
+    _componenteSurtido: true,
+    _indiceSurtido: indice,
+    _baseImponible: componente.BaseImponibleSurtido ?? componente.SubTotalSurtido,
+  })));
+  return impuestosSurtido.length ? impuestosSurtido : asArray(linea.Impuesto);
+}
+
+/**
+ * ImpuestoNeto = impuestos brutos menos exoneraciones e impuestos asumidos.
+ * Una diferencia de redondeo compatible con la precisión XML se acepta; una
+ * diferencia material no se reparte a ciegas entre tarifas o impuestos.
  */
 function extraerImpuestos(linea, signo, factor) {
-  const impuestos = asArray(linea.Impuesto).map(i => {
-    const bruto = numero(i.Monto);
-    const exonerado = asArray(i.Exoneracion).reduce((a, e) => a + numero(e.MontoExoneracion), 0);
-    if (bruto < -0.000001 || exonerado < -0.000001 || exonerado > bruto + 0.0002) {
-      throw new Error(`Impuesto o exoneración no válida en línea ${texto(linea.NumeroLinea) || '?'}`);
+  const numeroLinea = texto(linea.NumeroLinea) || '?';
+  const originales = impuestosDeclaradosEnLinea(linea);
+  const impuestos = originales.map(i => {
+    const brutoD = decimalFiscal(i.Monto, 'Impuesto.Monto', numeroLinea);
+    const exoneraciones = asArray(i.Exoneracion).map(e => decimalFiscal(e.MontoExoneracion,'MontoExoneracion',numeroLinea));
+    const bruto = brutoD.valor;
+    const exonerado = exoneraciones.reduce((a,e) => a + e.valor, 0);
+    if (bruto < -0.000001 || exonerado < -0.000001 || exonerado > bruto + 0.00001) {
+      throw new Error(`Impuesto o exoneración no válida en línea ${numeroLinea}`);
     }
     return {
       codigo: texto(i.Codigo), codigoTarifa: texto(i.CodigoTarifaIVA ?? i.CodigoTarifa), tarifa: numero(i.Tarifa),
       montoBruto: bruto, montoExonerado: exonerado, montoNeto: Math.max(0, bruto - exonerado),
+      incertidumbre: brutoD.semiancho + exoneraciones.reduce((a,e) => a + e.semiancho,0),
       exoneracion: i.Exoneracion || null,
+      baseSurtido: i._baseImponible == null ? null : numero(i._baseImponible),
+      esSurtido: Boolean(i._componenteSurtido),
+      indiceSurtido: i._indiceSurtido ?? null,
     };
   });
-  const declarado = linea.ImpuestoNeto == null ? null : numero(linea.ImpuestoNeto);
-  const asumido = numero(linea.ImpuestoAsumidoEmisorFabrica);
-  if (asumido < -0.000001) throw new Error('Impuesto asumido por emisor inválido');
+  const declaradoD = linea.ImpuestoNeto == null ? null : decimalFiscal(linea.ImpuestoNeto, 'ImpuestoNeto', numeroLinea);
+  const asumidoD = linea.ImpuestoAsumidoEmisorFabrica == null
+    ? {valor:0,semiancho:0} : decimalFiscal(linea.ImpuestoAsumidoEmisorFabrica,'ImpuestoAsumidoEmisorFabrica',numeroLinea);
+  const asumido = asumidoD.valor;
+  if (asumido < -0.000001) throw new Error(`Impuesto asumido por emisor inválido en línea ${numeroLinea}`);
   const suma = impuestos.reduce((n, i) => n + i.montoNeto, 0);
-  const objetivo = declarado ?? Math.max(0, suma - asumido);
-  const diferencia = suma - objetivo;
-  if (objetivo < -0.0002 || diferencia < -0.0002) {
-    throw new Error(`ImpuestoNeto no coincide con impuestos de la línea ${texto(linea.NumeroLinea) || '?'}`);
+  const esperado = suma - asumido;
+  const objetivo = declaradoD?.valor ?? Math.max(0, esperado);
+  const diferencia = objetivo - esperado;
+  // El valor decimal es declarativo: su cantidad de ceros finales NO autoriza
+  // aceptar otra cifra diferente sin contrastarla con el total de la linea.
+  // Antes se sumaban semianchos de ".00" y se aceptaban diferencias de 0.01
+  // sin verificación cruzada. Mantener estricta la primera comparación.
+  const toleranciaOriginal = 0.00002;
+
+  // Los XML recibidos muestran variaciones de 0.00005 CRC con importes de cinco
+  // decimales, inferiores a una diezmilésima de colón. No representan una
+  // diferencia fiscal material y no requieren alterar los XML originales.
+  const microTolerancia = Math.max(toleranciaOriginal, 0.00010001);
+  let reconciliacion = null;
+  const redondearCentimos = n => Math.round((n + Number.EPSILON) * 100);
+
+  if (objetivo < -microTolerancia) {
+    throw new Error(`ImpuestoNeto negativo en línea ${numeroLinea}: ${objetivo.toFixed(5)}`);
   }
-  if (diferencia > 0.0002) {
-    // Solo se puede determinar a qué tarifa descontar cuando existe un impuesto.
-    if (impuestos.length !== 1) {
-      throw new Error(`ImpuestoNeto ambiguo en línea ${texto(linea.NumeroLinea) || '?'} con múltiples impuestos; revisa el XML`);
+  if (Math.abs(diferencia) > toleranciaOriginal && Math.abs(diferencia) <= microTolerancia) {
+    reconciliacion = 'diferencia inferior a 0.0001 CRC';
+  }
+  if (Math.abs(diferencia) > microTolerancia && impuestos.length > 1) {
+    throw new Error(`ImpuestoNeto ambiguo en línea ${numeroLinea} con múltiples impuestos: declarado ${objetivo.toFixed(5)}, calculado ${esperado.toFixed(5)}. No se reparte una diferencia entre tarifas.`);
+  }
+  if (Math.abs(diferencia) > microTolerancia) {
+    // Hay emisores que publican Impuesto.Monto con más decimales, mientras
+    // ImpuestoNeto se concilia con MontoTotalLinea - SubTotal. Aceptamos como
+    // redondeo como máximo 1 céntimo si existe UNA tarifa y DOS comprobaciones
+    // independientes coinciden: total de línea y monto fiscal redondeado.
+    const tieneCamposLinea = linea.SubTotal != null && linea.MontoTotalLinea != null;
+    const subtotalD = tieneCamposLinea ? decimalFiscal(linea.SubTotal, 'SubTotal', numeroLinea) : null;
+    const montoLineaD = tieneCamposLinea ? decimalFiscal(linea.MontoTotalLinea, 'MontoTotalLinea', numeroLinea) : null;
+    const diferenciaTotal = tieneCamposLinea ? (montoLineaD.valor - subtotalD.valor) - objetivo : Infinity;
+    const toleranciaTotal = tieneCamposLinea
+      ? Math.max(0.00010001, montoLineaD.semiancho + subtotalD.semiancho + (declaradoD?.semiancho || 0) + 0.00000001)
+      : 0;
+    const conciliaTotal = Math.abs(diferenciaTotal) <= toleranciaTotal;
+    const conciliaImpuestoCentesimos = redondearCentimos(esperado) === redondearCentimos(objetivo);
+    const unico = impuestos.length === 1 && !impuestos[0].esSurtido;
+    const tasa = impuestos[0]?.tarifa;
+    const base = linea.BaseImponible ?? linea.SubTotal;
+    const conciliaBaseTarifa = unico && impuestos[0].codigo === '01' &&
+      base != null && Number.isFinite(tasa) && tasa > 0 &&
+      impuestos[0].montoExonerado === 0 && asumido === 0 &&
+      redondearCentimos(numero(base) * tasa / 100) === redondearCentimos(objetivo);
+    const diferenciaMaxima = Math.abs(diferencia) <= 0.01000001;
+    if (unico && declaradoD && diferenciaMaxima && conciliaTotal &&
+        (conciliaImpuestoCentesimos || conciliaBaseTarifa)) {
+      reconciliacion = `ajuste de redondeo conciliado con total de línea (${diferencia.toFixed(5)} CRC)`;
+    } else {
+      throw new Error(`ImpuestoNeto no coincide con impuestos de la línea ${numeroLinea}: declarado ${objetivo.toFixed(5)}, ` +
+        `calculado ${esperado.toFixed(5)}, diferencia ${diferencia.toFixed(5)}, impuestos ${impuestos.length}. ` +
+        'No se pudo justificar por precisión ni conciliar con el total de línea y la tarifa.');
     }
+  }
+  // Cuando solo hay un impuesto, el impuesto neto DECLARADO determina el IVA
+  // contable. Se conserva el impuesto bruto original para auditoría. No se
+  // distribuye automáticamente un ajuste entre tarifas distintas.
+  if (impuestos.length === 1) {
     impuestos[0].montoNeto = Math.max(0, objetivo);
-  } else if (impuestos.length === 1 && declarado != null && Math.abs(diferencia) > 0) {
-    // Ajuste mínimo por redondeo declarado por el emisor (hasta 0.0002).
-    impuestos[0].montoNeto = Math.max(0, objetivo);
+  } else if (asumido > microTolerancia || (declaradoD && Math.abs(diferencia) > microTolerancia)) {
+    throw new Error(`ImpuestoNeto ambiguo en línea ${numeroLinea} con múltiples impuestos; requiere desglose por tarifa.`);
   }
   return impuestos.map(i => ({
     codigo:i.codigo, codigoTarifa:i.codigoTarifa, tarifa:i.tarifa,
     monto:i.montoNeto * signo * factor, impuestoNeto:i.montoNeto * signo * factor,
     montoBruto:i.montoBruto * signo * factor, montoExonerado:i.montoExonerado * signo * factor,
-    exoneracion:i.exoneracion,
+    exoneracion:i.exoneracion, baseSurtido:i.baseSurtido == null ? null : i.baseSurtido * signo * factor,
+    esSurtido:i.esSurtido, indiceSurtido:i.indiceSurtido,
+    observacionRedondeo: reconciliacion,
   }));
 }
 function extraerDetalleLineas(doc, signo, factor = 1) {
@@ -105,6 +203,7 @@ function extraerDetalleLineas(doc, signo, factor = 1) {
       : impuestos.reduce((sum, i) => sum + i.monto, 0),
     montoTotalLinea: numero(l.MontoTotalLinea) * signo * factor,
     detalleSurtido: asArray(l.DetalleSurtido),
+    observacionesFiscales: [...new Set(impuestos.map(i => i.observacionRedondeo).filter(Boolean))],
     });
   });
 }
@@ -145,23 +244,25 @@ function procesarDocumento(parsed, nombreArchivo, xml, referencia=null) {
       const clave = `${imp.codigoTarifa || 'sin-codigo'}:${tasa}`;
       if (!desgloseTarifas[clave]) desgloseTarifas[clave] = {codigoTarifa: imp.codigoTarifa, tarifa: imp.tarifa, base: 0, impuesto: 0};
       desgloseTarifas[clave].impuesto += imp.monto;
-      if (!tasasEnLinea.has(clave)) {
+      const claveBase = imp.esSurtido ? `${clave}:surtido:${imp.indiceSurtido}` : clave;
+      if (!tasasEnLinea.has(claveBase)) {
         const proporcion = Math.abs(imp.montoBruto) > 0.0000001
           ? Math.max(0, Math.min(1, imp.monto / imp.montoBruto)) : 1;
-        desgloseTarifas[clave].base += baseLinea * proporcion;
-        tasasEnLinea.add(clave);
+        desgloseTarifas[clave].base += (imp.baseSurtido == null ? baseLinea : imp.baseSurtido) * proporcion;
+        tasasEnLinea.add(claveBase);
       }
     }
     // Base para el gráfico legado: una sola vez por tarifa por línea.
     const tasas = new Set();
     for (const imp of iva) {
       const tasa = String(imp.tarifa);
-      if (tasas.has(tasa) || !(tasa in bases)) continue;
-      tasas.add(tasa);
+      const claveTasa = imp.esSurtido ? `${tasa}:surtido:${imp.indiceSurtido}` : tasa;
+      if (tasas.has(claveTasa) || !(tasa in bases)) continue;
+      tasas.add(claveTasa);
       // La base del informe IVA representa la parte no exonerada de la línea.
       const proporcion = Math.abs(imp.montoBruto) > 0.0000001
         ? Math.max(0, Math.min(1, imp.monto / imp.montoBruto)) : 1;
-      bases[tasa] += baseLinea * proporcion;
+      bases[tasa] += (imp.baseSurtido == null ? baseLinea : imp.baseSurtido) * proporcion;
     }
   }
   return {
@@ -178,6 +279,7 @@ function procesarDocumento(parsed, nombreArchivo, xml, referencia=null) {
     emisor: persona(doc.Emisor), receptor: persona(doc.Receptor),
     referencias: asArray(doc.InformacionReferencia), otrosCargos: asArray(doc.OtrosCargos),
     impuestos, bases, desgloseTarifas, resumen, detalle,
+    observacionesFiscales: detalle.flatMap(l => (l.observacionesFiscales || []).map(mensaje => ({linea:l.linea,mensaje}))),
   };
 }
 async function parsearXML(xml) {

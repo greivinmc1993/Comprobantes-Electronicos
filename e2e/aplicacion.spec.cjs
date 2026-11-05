@@ -25,7 +25,17 @@ test.beforeEach(async({page})=>{
    consultarTipoCambio:async()=>({disponible:false,advertencia:'Offline de prueba'}),
    recalcularUSD:async()=>({actualizados:0,respaldo:'/mock'}),repararIVA:async()=>({actualizados:0}),
    abrirCarpetaRespaldos:async()=>({}),seleccionarCarpetaRespaldos:async()=>({}),
-   moverDocumento:async()=>({movido:false}),eliminar:async()=>({eliminado:false})
+   moverDocumento:async()=>({movido:false}),eliminar:async()=>({eliminado:false}),
+   ultimoLote:async()=>({id:1,cantidad:1,deshecho_en:null,creado_en:'2026-11-05'}),
+   previsualizar:async()=>({token:'vista-sintetica',filas:[{indice:0,archivo:'ejemplo.xml',estado:'listo',empresaSugerida:1,
+     empresasCompatibles:[1],sinCedula:[1],existentes:[],tipo:'Factura electrónica',total:113,moneda:'CRC'}]}),
+   confirmarImportacion:async()=>({loteId:2,nuevos:1,duplicados:0}),
+   deshacerImportacion:async()=>({deshechos:1,respaldo:'/mock'}),
+   gestionContable:async()=>({conciliaciones:[],resumen:{}}),
+   mensajesHacienda:async()=>[],importarMensajes:async()=>({nuevos:0,duplicados:0,errores:[]}),
+   auditoria:async()=>[],vigilanciaEstado:async()=>({habilitado:false,carpeta:'',pendientes:[]}),
+   previsualizarPendientes:async()=>({token:'t',filas:[]}),
+   validarRespaldo:async()=>({cancelado:true})
   };
  });
  await page.goto('/');
@@ -55,4 +65,20 @@ test('Se abre el formulario de empresa y acepta un nombre nuevo',async({page})=>
  await dlg.getByRole('button',{name:'Crear empresa'}).click();
  await expect(dlg).toBeHidden();
  await expect(page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Oeste/})).toBeVisible();
+});
+
+test('Importación inteligente muestra vista previa y exige confirmar destino',async({page})=>{
+ await page.getByRole('button',{name:'Importación inteligente'}).click();
+ await page.locator('input[type=file]').first().setInputFiles({name:'ejemplo.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')});
+ const modal=page.getByRole('dialog',{name:'Vista previa de importación XML'});
+ await expect(modal).toBeVisible();
+ await expect(modal.getByText('ejemplo.xml')).toBeVisible();
+ await modal.getByRole('button',{name:/Confirmar 1 XML/}).click();
+ await expect(modal).toBeHidden();
+});
+test('Centro contable y auditoría están disponibles en menú',async({page})=>{
+ await page.getByRole('button',{name:'Compras y ventas'}).click();
+ await expect(page.getByRole('heading',{name:'Compras, ventas y conciliación'})).toBeVisible();
+ await page.getByRole('button',{name:'Bitácora'}).click();
+ await expect(page.getByRole('heading',{name:'Bitácora de operaciones'})).toBeVisible();
 });
