@@ -1,29 +1,121 @@
+# ============================================================
+# ComprobantesElectronicosCR | React + Vite + Electron + SQLite
+# Subir codigo fuente, pruebas, recursos y GitHub Actions.
+# NO subir datos fiscales, bases reales ni archivos generados.
+# ============================================================
+
+# 1. Dependencias y caches de Node / Vite
 node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.vite/
+.cache/
+.eslintcache
+*.tsbuildinfo
+
+# 2. Compilaciones y paquetes de Electron / NSIS
+# IMPORTANTE: NO ignorar build/; contiene iconos y sidebar.bmp.
 dist/
 release/
-*.log
-.env
-.env.*
-!.env.example
+out/
+packaged/
+*.exe
+*.msi
+*.msix
+*.appx
+*.blockmap
+*.nsis.7z
+*.zip
+*.7z
+
+# 3. Bases de datos y datos de clientes (SQLite)
 *.sqlite
-*.sqlite-shm
-*.sqlite-wal
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
 *.db
-coverage/
-.DS_Store
+*.db3
+*.db-*
+*.db3-*
+*.db-journal
+*.sqlite-journal
+*.sql.gz
+data/
+database-data/
+backups/
+respaldos/
+copias-seguridad/
+imports/
+importaciones/
+documentos-privados/
 
-# Salidas de QA y desarrollo
-qa-results/
-coverage/
-playwright-report/
-test-results/
-*.tmp
-*.sqlite-wal
-*.sqlite-shm
-.DS_Store
-
-# Documentos fiscales/archivos exportados: evitar subir datos de clientes
+# 4. Comprobantes reales y exportaciones
 *.xml
 *.pdf
 *.csv
 *.xlsx
+*.xls
+# Se permiten SOLO XML/PDF/CSV sintéticos para pruebas versionadas.
+!tests/fixtures/**/*.xml
+!tests/fixtures/**/*.pdf
+!tests/fixtures/**/*.csv
+!e2e/fixtures/**/*.xml
+!e2e/fixtures/**/*.pdf
+!e2e/fixtures/**/*.csv
+
+# 5. Secretos, variables de entorno y firmas
+.env
+.env.*
+!.env.example
+!.env.sample
+.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# 6. QA: salidas generadas, cobertura y capturas temporales
+qa-results/
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# 7. Logs, archivos temporales y respaldos manuales
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+*.swp
+*.swo
+*~
+tmp/
+temp/
+
+# 8. Configuraciones locales del editor y del sistema
+.vscode/
+.idea/
+*.suo
+*.user
+*.sln.docstates
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Se deben versionar: package.json, package-lock.json, README.md,
+# .github/workflows/, tests/, e2e/, backend/, frontend/, electron/,
+# build/icons/ y build/installer/.
