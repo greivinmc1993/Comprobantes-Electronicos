@@ -27,7 +27,7 @@ jobs:
           node -e "const f=require('./qa-results/auditoria-npm.json');const v=f.metadata?.vulnerabilities||{};console.log('Vulnerabilidades reportadas:',JSON.stringify(v))"
       - name: Descargar informe de seguridad
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: seguridad-npm
           path: qa-results/auditoria-npm.json

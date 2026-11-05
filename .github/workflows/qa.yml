@@ -45,7 +45,7 @@ jobs:
         run: npm run check:package
       - name: Adjuntar resultados JUnit
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qa-junit-${{ matrix.os }}
           path: qa-results/*.xml
@@ -69,7 +69,7 @@ jobs:
         run: npm run test:e2e
       - name: Publicar capturas, trazas, HTML y JUnit
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qa-interfaz-playwright
           path: |

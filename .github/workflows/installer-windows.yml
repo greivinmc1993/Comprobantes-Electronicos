@@ -42,7 +42,7 @@ jobs:
             Get-FileHash $exe.FullName -Algorithm SHA256 | Format-List
           }
       - name: Subir instalador como artefacto privado de Actions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ComprobantesElectronicosCR-Instalador-Windows
           path: release/ComprobantesElectronicosCR-Setup-*-x64.exe
@@ -50,7 +50,7 @@ jobs:
           retention-days: 30
       - name: Subir JUnit
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qa-junit-build-windows
           path: qa-results/*.xml
