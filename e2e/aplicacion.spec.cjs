@@ -1,0 +1,58 @@
+'use strict';
+const {test,expect}=require('@playwright/test');
+
+// Datos sintéticos en memoria; no hay SQLite real ni datos personales en el navegador.
+test.beforeEach(async({page})=>{
+ await page.addInitScript(()=>{
+  const perfiles=[
+    {id:1,nombre:'Empresa Ficticia Norte',cedula:'',color:'#2563EB',cantidad:1},
+    {id:2,nombre:'Empresa Ficticia Sur',cedula:'',color:'#0F766E',cantidad:0}
+  ];
+  const factura={id:1,perfilId:1,clave:'50600000000000000000000000000000000000000000000001',consecutivo:'00100001010000000001',
+   tipoDocumento:'Factura electrónica',versionXML:'4.4',fecha:'2026-11-02T10:00:00',
+   total:113,monedaOriginal:'CRC',tipoCambioAplicado:1,totalOriginal:113,comercio:'Comercio ficticio',
+   emisor:{nombre:'Comercio ficticio',identificacion:{numero:'3101111111'}},receptor:{nombre:'Cliente ficticio'},
+   bases:{'13':100},impuestos:[{codigo:'01',tarifa:13,monto:13}],detalle:[]};
+  const estado=id=>({perfil:perfiles.find(p=>p.id===id),facturas:id===1?[factura]:[],iva:{'13':id===1?13:0},base:{'13':id===1?100:0},totalNeto:id===1?113:0,documentos:{},errores:[]});
+  window.comprobantesDesktop={
+   listarPerfiles:async()=>({perfiles:[...perfiles]}),listar:async(id)=>estado(id),
+   crearPerfil:async(p)=>{const perfil={...p,id:perfiles.length+1,cantidad:0};perfiles.push(perfil);return {perfil};},
+   actualizarPerfil:async(id,p)=>{const perfil=perfiles.find(x=>x.id===id);Object.assign(perfil,p);return {perfil};},
+   eliminarPerfil:async()=>({documentosAfectados:0,respaldo:'/mock/backup.sqlite'}),
+   importar:async()=>({importacion:{nuevos:0,duplicados:0},errores:[],avisos:[]}),
+   respaldar:async()=>({guardado:false}),estadoRespaldos:async()=>({habilitado:true,frecuencia:'diario',retener:14,carpeta:'/mock',copias:[]}),
+   configurarRespaldos:async p=>({...p,carpeta:'/mock',copias:[]}),crearRespaldo:async()=>({nombre:'mock.sqlite'}),
+   consultarTipoCambio:async()=>({disponible:false,advertencia:'Offline de prueba'}),
+   recalcularUSD:async()=>({actualizados:0,respaldo:'/mock'}),repararIVA:async()=>({actualizados:0}),
+   abrirCarpetaRespaldos:async()=>({}),seleccionarCarpetaRespaldos:async()=>({}),
+   moverDocumento:async()=>({movido:false}),eliminar:async()=>({eliminado:false})
+  };
+ });
+ await page.goto('/');
+ await expect(page.getByRole('heading',{name:'Panel general'})).toBeVisible();
+});
+
+test('El panel muestra perfiles, métricas y filtro de período',async({page})=>{
+ await expect(page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Norte/})).toBeVisible();
+ await expect(page.getByRole('region',{name:'Filtrar estadísticas del panel general por fecha'})).toBeVisible();
+ await page.getByLabel('Seleccionar período del panel').selectOption('mes');
+ await expect(page.getByLabel('Mes del panel general')).toBeVisible();
+ await page.getByLabel('Mes del panel general').fill('2026-11');
+ await expect(page.getByText(/1 comprobante en el período/)).toBeVisible();
+});
+test('Selector personalizado permite cambiar empresa sin mezclar comprobantes',async({page})=>{
+ await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Norte/}).click();
+ await expect(page.getByRole('menu',{name:'Cambiar empresa'})).toBeVisible();
+ await page.getByRole('menuitemradio',{name:/Empresa Ficticia Sur/}).click();
+ await expect(page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Sur/})).toBeVisible();
+ await expect(page.locator('.kpi-valor').first()).toHaveText('0');
+});
+test('Se abre el formulario de empresa y acepta un nombre nuevo',async({page})=>{
+ await page.getByRole('button',{name:'Nueva empresa'}).first().click();
+ const dlg=page.getByRole('dialog',{name:'Formulario de empresa'});
+ await expect(dlg).toBeVisible();
+ await dlg.getByPlaceholder('Ej. Comercial La Esperanza S.A.').fill('Empresa Ficticia Oeste');
+ await dlg.getByRole('button',{name:'Crear empresa'}).click();
+ await expect(dlg).toBeHidden();
+ await expect(page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Oeste/})).toBeVisible();
+});

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1260a5"/><stop offset="0.45" stop-color="#093c75"/><stop offset="1" stop-color="#061b3b"/></linearGradient>
+ <linearGradient id="paper" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#c8dfff"/></linearGradient>
+ <linearGradient id="gold" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffe68a"/><stop offset="1" stop-color="#e8a81b"/></linearGradient>
+ <linearGradient id="calculator" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#ecf5ff"/><stop offset="1" stop-color="#7ba9eb"/></linearGradient>
+ <filter id="shadow"><feDropShadow dx="0" dy="18" stdDeviation="19" flood-color="#00152f" flood-opacity="0.43"/></filter>
+ <clipPath id="round"><rect x="20" y="20" width="984" height="984" rx="205"/></clipPath>
+</defs>
+<g clip-path="url(#round)">
+ <rect x="20" y="20" width="984" height="984" rx="205" fill="url(#bg)"/>
+ <path d="M0 200 C180 40 385 30 705 80 C895 120 1000 36 1060 0" stroke="#47c1ff" stroke-opacity=".5" stroke-width="34" fill="none"/>
+ <path d="M-15 930 C350 700 640 1040 1080 815" fill="none" stroke="#2e79ce" stroke-opacity=".18" stroke-width="96"/>
+ <!-- main invoice document -->
+ <g filter="url(#shadow)">
+  <path d="M233 176 Q233 136 272 136 H638 L770 275 V746 Q770 782 732 782 H272 Q233 782 233 742 Z" fill="url(#paper)" stroke="#e7f2ff" stroke-width="11"/>
+  <path d="M638 136 V239 Q638 278 676 278 H770 Z" fill="#8cbbf6" stroke="#dceaff" stroke-width="10" stroke-linejoin="round"/>
+  <rect x="300" y="232" width="220" height="20" rx="10" fill="#6ca6ec"/>
+  <text x="300" y="468" fill="#114a9a" font-size="196" font-family="Arial,Helvetica,sans-serif" font-weight="900" letter-spacing="-7">FE</text>
+  <rect x="301" y="524" width="305" height="18" rx="9" fill="#87b7ed"/>
+  <rect x="301" y="560" width="232" height="14" rx="7" fill="#aacaf0"/>
+ </g>
+ <!-- financial chart rising -->
+ <g stroke="#ffffff" stroke-opacity=".4" stroke-width="5">
+  <rect x="551" y="478" width="66" height="122" rx="10" fill="#27ac8a"/>
+  <rect x="628" y="411" width="66" height="189" rx="10" fill="#f3ba39"/>
+  <rect x="705" y="348" width="66" height="252" rx="10" fill="#f9cc55"/>
+ </g>
+ <path d="M556 448 L620 416 L663 441 L733 331" fill="none" stroke="#079c74" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M705 339 L739 320 L740 366" fill="none" stroke="#079c74" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+ <!-- subtle Costa Rican tricolor ribbons -->
+ <g filter="url(#shadow)">
+  <path d="M18 665 Q160 605 342 692 Q427 736 507 705 L507 770 Q409 810 317 765 Q155 690 18 766 Z" fill="#1461bc"/>
+  <path d="M18 690 Q160 630 342 717 Q427 761 507 730 L507 805 Q409 845 317 800 Q155 725 18 801 Z" fill="#ffffff"/>
+  <path d="M18 723 Q160 665 342 751 Q427 795 507 765 L507 848 Q409 888 317 843 Q155 758 18 835 Z" fill="#dc263d"/>
+  <path d="M18 779 Q160 719 342 805 Q427 850 507 820 L507 873 Q409 914 317 872 Q155 793 18 866 Z" fill="#ffffff"/>
+  <path d="M18 817 Q160 760 342 841 Q427 886 507 859 L507 902 Q409 942 317 906 Q155 829 18 909 Z" fill="#1461bc"/>
+ </g>
+ <!-- coin stack -->
+ <g filter="url(#shadow)" stroke="#d79719" stroke-width="6">
+  <rect x="335" y="732" width="198" height="149" rx="27" fill="url(#gold)"/>
+  <ellipse cx="434" cy="732" rx="99" ry="32" fill="#ffe17b"/>
+  <path d="M339 790 Q430 842 530 788 M339 839 Q430 888 530 837" stroke="#fff3b9" stroke-width="14" fill="none"/>
+  <ellipse cx="434" cy="881" rx="99" ry="28" fill="#e6a318"/>
+  <path d="M339 881 Q430 909 530 881" stroke="#ffdb68" stroke-width="8" fill="none"/>
+ </g>
+ <!-- calculator -->
+ <g filter="url(#shadow)">
+  <rect x="592" y="650" width="284" height="297" rx="46" fill="url(#calculator)" stroke="#1e579d" stroke-width="14"/>
+  <rect x="628" y="690" width="210" height="76" rx="17" fill="#113f7e"/>
+  <rect x="648" y="712" width="172" height="30" rx="9" fill="#8adddd"/>
+  <rect x="630" y="799" width="58" height="48" rx="12" fill="#125396"/>
+  <rect x="703" y="799" width="58" height="48" rx="12" fill="#125396"/>
+  <rect x="776" y="799" width="58" height="48" rx="12" fill="#125396"/>
+  <rect x="630" y="864" width="58" height="48" rx="12" fill="#125396"/>
+  <rect x="703" y="864" width="58" height="48" rx="12" fill="#125396"/>
+  <rect x="776" y="864" width="58" height="48" rx="12" fill="#125396"/>
+ </g>
+</g>
+</svg>

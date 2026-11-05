@@ -1,0 +1,29 @@
+node_modules/
+dist/
+release/
+*.log
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+coverage/
+.DS_Store
+
+# Salidas de QA y desarrollo
+qa-results/
+coverage/
+playwright-report/
+test-results/
+*.tmp
+*.sqlite-wal
+*.sqlite-shm
+.DS_Store
+
+# Documentos fiscales/archivos exportados: evitar subir datos de clientes
+*.xml
+*.pdf
+*.csv
+*.xlsx

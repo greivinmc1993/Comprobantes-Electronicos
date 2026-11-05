@@ -1,0 +1,35 @@
+name: Seguridad - Auditoría de dependencias
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '40 9 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  auditoria:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Auditoría npm y registro del resultado
+        shell: bash
+        run: |
+          mkdir -p qa-results
+          npm audit --omit=dev --audit-level=moderate --json > qa-results/auditoria-npm.json || echo 'Se detectaron advertencias; revisar el JSON adjunto.'
+          node -e "const f=require('./qa-results/auditoria-npm.json');const v=f.metadata?.vulnerabilities||{};console.log('Vulnerabilidades reportadas:',JSON.stringify(v))"
+      - name: Descargar informe de seguridad
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seguridad-npm
+          path: qa-results/auditoria-npm.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,14 @@
+'use strict';
+const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
+const root=path.join(__dirname,'..');
+const pkg=require(path.join(root,'package.json'));
+const dist=path.join(root,'dist','index.html');
+assert.ok(fs.existsSync(dist),'Falta dist/index.html. Ejecuta npm run build.');
+assert.ok(fs.statSync(dist).size>100,'index.html compilado vacío.');
+const html=fs.readFileSync(dist,'utf8');
+assert.match(html,/assets\//,'La compilación no referencia assets de Vite.');
+const archivos=fs.readdirSync(path.join(root,'dist','assets'));
+assert.ok(archivos.some(x=>x.endsWith('.js')),'No se encontró el bundle JS.');
+assert.ok(archivos.some(x=>x.endsWith('.css')),'No se encontró CSS compilado.');
+assert.equal(pkg.build.appId,'cr.comprobanteselectronicoscr.desktop');
+console.log(`✓ Vite compilado: ${archivos.length} assets; identidad Windows independiente.`);
