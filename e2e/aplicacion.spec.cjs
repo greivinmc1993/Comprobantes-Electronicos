@@ -194,3 +194,38 @@ test('Total XML cero: importe manual solo afecta al reporte de gastos',async({pa
  await expect(page.getByRole('heading',{name:'Gastos administrativos',level:1})).toBeVisible();
  await expect(page.locator('.gastos-resumen')).toContainText(/30[.,\s]003[.,\s]00/);
 });
+
+test('Cupón sin IVA y total fiscal cero: referencia se registra solo con confirmación',async({page})=>{
+ await page.evaluate(()=>{
+   const listarAnterior=window.comprobantesDesktop.listar;
+   window.comprobantesDesktop.listar=async id=>{
+     const estado=await listarAnterior(id);
+     if(id===1) estado.facturas=estado.facturas.map(f=>({...f,total:0,totalOriginal:0,
+       resumen:{...f.resumen,totalVenta:10025,totalNoSujeto:10025,totalDescuentos:10025,
+         totalVentaNeta:0,totalGravado:0,totalImpuesto:0,
+         medioPago:[{tipo:'99',medio:null,total:10025}]},
+       impuestos:[],gastoAdministrativo:f.gastoAdministrativo,montoGastoManual:f.montoGastoManual}));
+     return estado;
+   };
+ });
+ // Volver a consultar los documentos sintéticos de la empresa de QA.
+ await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Norte/}).click();
+ await page.getByRole('menuitemradio',{name:/Empresa Ficticia Sur/}).click();
+ await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Sur/}).click();
+ await page.getByRole('menuitemradio',{name:/Empresa Ficticia Norte/}).click();
+ await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Comprobantes',exact:true}).click();
+ await page.locator('tr.fila-interactiva').first().click();
+ const dlg=page.getByRole('dialog',{name:'Detalle de comprobante'});
+ await expect(dlg.locator('.detail-total')).toContainText('₡0,00');
+ await expect(dlg.locator('.cupon-referencia')).toContainText('₡10.025,00');
+ await dlg.getByRole('checkbox',{name:/Guardar este comprobante como gasto administrativo/}).check();
+ await expect(dlg.locator('.detail-gasto-admin')).toContainText('₡0,00');
+ page.once('dialog',confirmacion=>confirmacion.accept());
+ await dlg.getByRole('button',{name:'Registrar referencia como gasto manual'}).click();
+ await expect(dlg.locator('.detail-gasto-admin')).toContainText('₡10.025,00');
+ await expect(dlg.locator('.detail-total')).toContainText('₡0,00');
+ await dlg.getByTitle('Cerrar').click();
+ await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Gastos administrativos',exact:true}).click();
+ await expect(page.locator('.gastos-resumen')).toContainText('₡10.025,00');
+ await expect(page.locator('.gastos-resumen')).toContainText('₡0,00');
+});

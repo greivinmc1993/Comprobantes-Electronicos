@@ -11,6 +11,7 @@ import {
 } from './reportes';
 import './App.css';
 import {fechaLocal,obtenerRangoPanel,filtrarPorPeriodo,mismoMes,etiquetaRango} from './periodos.mjs';
+import {referenciaCuponNoSujeto} from './gastos-administrativos.mjs';
 
 const PERFIL_VACIO={nombre:'',cedula:'',correo:'',telefono:'',direccion:'',color:'#2563EB'};
 const PALETA=['#2563EB','#0891B2','#0F766E','#7C3AED','#D97706','#DC5462'];
@@ -829,10 +830,14 @@ export default function App() {
         <strong>{crc(resumenGastosAdministrativos([seleccionado]).totalGastos)}</strong>
         <small>{seleccionado.montoGastoManual!=null?'Importe manual para reportes; no modifica el total del XML.':'Importe calculado desde la venta neta del XML.'}</small>
       </div>}
+      {referenciaCuponNoSujeto(seleccionado)&&<div className="qa-fiscal-warning cupon-referencia" role="note">
+        <strong>Importe de referencia del medio de pago: {crc(referenciaCuponNoSujeto(seleccionado).monto)}</strong>
+        <span>El XML declara total fiscal e IVA de ₡0,00. {referenciaCuponNoSujeto(seleccionado).fuente}. No se registra automáticamente como gasto; verifica el soporte contable antes de usarlo.</span>
+      </div>}
       <h3 className="drawer-section-title">Información del comprobante</h3><div className="detail-grid">
         {[['Tipo',seleccionado.tipoDocumento],['Fecha',fechaCorta(seleccionado.fecha)],['Versión',seleccionado.versionXML||'—'],['Archivo',seleccionado.nombreArchivo],['Clave',seleccionado.clave],['Consecutivo',seleccionado.consecutivo],['Moneda original',seleccionado.monedaOriginal],['Cambio original XML',seleccionado.tipoCambioOriginalXML ? `${seleccionado.tipoCambioOriginalXML}`:'—'],['Cambio aplicado',seleccionado.tipoCambioAplicado||1],['Fuente del tipo de cambio',seleccionado.fuenteTipoCambio||'Versión anterior: no registrada'],['Fecha de la referencia',seleccionado.fechaTipoCambio||'—'],['Actividad emisor',seleccionado.codigoActividadEmisor||'—']].map(([k,v])=><div key={k}><span>{k}</span><strong>{v||'—'}</strong></div>)}
       </div><h3 className="drawer-section-title">Emisor y receptor</h3><div className="entity-pair"><div><small>EMISOR</small><strong>{seleccionado.emisor?.nombre||'—'}</strong><span>{seleccionado.emisor?.identificacion?.numero||'Sin identificación'}</span></div><div><small>RECEPTOR</small><strong>{seleccionado.receptor?.nombre||'—'}</strong><span>{seleccionado.receptor?.identificacion?.numero||'Sin identificación'}</span></div></div>
-      <h3 className="drawer-section-title">Resumen monetario</h3><div className="money-lines">{[['Total de venta',seleccionado.resumen?.totalVenta],['Descuentos',seleccionado.resumen?.totalDescuentos],['Venta neta',seleccionado.resumen?.totalVentaNeta],['Impuestos',seleccionado.resumen?.totalImpuesto],['Total comprobante',seleccionado.total]].map(([k,v])=><div key={k}><span>{k}</span><strong>{crc(v)}</strong></div>)}</div>
+      <h3 className="drawer-section-title">Resumen monetario</h3><div className="money-lines">{[['Total de venta',seleccionado.resumen?.totalVenta],['Descuentos',seleccionado.resumen?.totalDescuentos],['No sujeto al IVA (referencia del XML)',seleccionado.resumen?.totalNoSujeto],['Venta neta',seleccionado.resumen?.totalVentaNeta],['Impuestos',seleccionado.resumen?.totalImpuesto],['Total comprobante',seleccionado.total]].map(([k,v])=><div key={k}><span>{k}</span><strong>{crc(v)}</strong></div>)}</div>
       <h3 className="drawer-section-title">Artículos y servicios ({seleccionado.detalle?.length||0})</h3><div className="lineas-detalle">{(seleccionado.detalle||[]).slice(0,limiteLineas).map((l,i)=><div className="linea-card" key={i}><div><span className="linea-id">#{l.linea}</span><strong>{l.detalle||'Sin descripción'}</strong></div><small>CAByS: {l.codigoCABYS||l.codigo||'—'}</small><div className="linea-montos"><span>{l.cantidad} × {crc(l.precioUnitario)}</span><strong>{crc(l.montoTotalLinea)}</strong></div><small>IVA: {(l.impuestos||[]).map(x=>`${x.tarifa}%`).join(', ')||'No indicado'}</small></div>)}{!seleccionado.detalle?.length&&<p className="texto-secundario">Este documento no incluye líneas de detalle.</p>}{(seleccionado.detalle?.length||0)>limiteLineas&&<Boton clase="btn-light" onClick={()=>setLimiteLineas(n=>n+30)}>Mostrar 30 líneas más</Boton>}</div>
       <h3 className="drawer-section-title">Gasto administrativo</h3>
       <section className="gasto-drawer-box" aria-label="Clasificación contable del comprobante">
@@ -842,6 +847,16 @@ export default function App() {
         </label>
         {Math.abs(numero(seleccionado.total))<0.000001 && numero(seleccionado.resumen?.totalVenta)>0&&
           <div className="qa-fiscal-warning" role="note">Este XML declara total ₡0,00, venta {crc(seleccionado.resumen?.totalVenta)} y descuentos {crc(seleccionado.resumen?.totalDescuentos)}. Verifica el XML original: no se debe asumir que la venta fue efectivamente pagada.</div>}
+        {seleccionado.gastoAdministrativo&&referenciaCuponNoSujeto(seleccionado)&&
+          <div className="cupon-confirmacion">
+            <p>Referencia de medio de pago en este XML: <strong>{crc(referenciaCuponNoSujeto(seleccionado).monto)}</strong>. No constituye automáticamente un gasto deducible.</p>
+            <Boton clase="btn-light" disabled={cargando} onClick={()=>{
+              const importe=referenciaCuponNoSujeto(seleccionado).monto;
+              if(!window.confirm(`El comprobante fiscal tiene total ₡0,00. ¿Registrar ₡${importe.toLocaleString('es-CR',{minimumFractionDigits:2})} como referencia manual de gasto administrativo, tras comprobar el soporte contable? El XML y el IVA no cambiarán.`)) return;
+              setGastoManualInput(String(importe));
+              guardarGastoAdministrativo(seleccionado,true,String(importe));
+            }}>Registrar referencia como gasto manual</Boton>
+          </div>}
         {seleccionado.gastoAdministrativo&&<div className="gasto-monto-manual">
           <Campo titulo="Monto de gasto sin IVA en colones (opcional; manual)">
             <input inputMode="decimal" type="text" placeholder={`Ej.: ${numero(seleccionado.resumen?.totalVenta).toFixed(2)}`} value={gastoManualInput} onChange={e=>setGastoManualInput(e.target.value)}/>

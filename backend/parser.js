@@ -271,7 +271,7 @@ function extraerResumen(doc, signo, factor, moneda) {
     fuenteTipoCambio: moneda.fuenteTipoCambio, fechaTipoCambio: moneda.fechaTipoCambio,
     tipoCambioVerificado: moneda.tipoCambioVerificado,
     desgloseImpuestos: asArray(r.TotalDesgloseImpuesto).map(i => ({ codigo: texto(i.Codigo), codigoTarifa: texto(i.CodigoTarifaIVA ?? i.CodigoTarifa), monto: numero(i.TotalMontoImpuesto) * signo * factor })),
-    medioPago: asArray(r.MedioPago).map(m => typeof m === 'string' ? {tipo: m, medio: m, total: null} : ({ tipo: texto(m.TipoMedioPago ?? m.CodigoMedioPago), medio: texto(m.MedioPago), total: m.TotalMedioPago != null ? numero(m.TotalMedioPago) * signo * factor : null })),
+    medioPago: asArray(r.MedioPago).map(m => typeof m === 'string' ? {tipo: m, medio: m, total: null} : ({ tipo: texto(m.TipoMedioPago ?? m.CodigoMedioPago), medio: texto(m.MedioPagoOtros ?? m.MedioPago), total: m.TotalMedioPago != null ? numero(m.TotalMedioPago) * signo * factor : null })),
   };
 }
 function procesarDocumento(parsed, nombreArchivo, xml, referencia=null) {

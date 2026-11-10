@@ -114,3 +114,12 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - **Playwright:** seleccionar la sección mediante la navegación «Secciones», comprobar el `h1` correspondiente y realizar después las acciones de gasto.
 - **Desktop y móvil:** verificar casilla de clasificación administrativa, monto base de ₡100, IVA de ₡13 inalterado y factura con total XML cero con monto manual de ₡30.003.
 - Los casos no utilizan documentos reales. Los resultados completos deben verificarse en GitHub Actions con Chromium y npm instalados.
+
+
+### v1.4.6 — Comprobante de combustible pagado con cupón
+
+- El `TotalComprobante=0` no se cambia por el valor del cupón.
+- Solo se sugiere referencia si hay coincidencia entre venta, descuento, no sujeto, cupón y medio de pago único.
+- Registrar gasto manual requiere consentimiento en la interfaz; IVA se conserva.
+- Nota de crédito no dispara sugerencia.
+- CSV y Excel distinguen monto de gasto y referencia de cupón sin sumarla a totales.

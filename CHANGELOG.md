@@ -1,5 +1,14 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.6 — Comprobantes con cupón y total fiscal cero
+
+- Mostrar pago con cupón y mercancías no sujetas cuando el XML declara descuento total.
+- Sugerir el monto documental del cupón como referencia, sin sumarlo al gasto ni al IVA automáticamente.
+- Botón de confirmación para registrar importe manual del cupón como gasto administrativo.
+- Reportes CSV y Excel separan la referencia de cupón de los importes contables efectivamente registrados.
+- QA sintético para cupones, sin incluir XML reales de clientes.
+
+
 ## 1.4.5 — Navegación accesible y E2E de gastos administrativos
 
 - Nombre accesible estable para «Comprobantes» pese a su contador visual; estado de navegación expuesto con `aria-current`.

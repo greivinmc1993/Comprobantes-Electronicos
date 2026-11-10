@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.5-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.6-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -37,7 +37,7 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
 
-## Novedades v1.4.5 — Corrección de Playwright y navegación accesible
+## Novedades v1.4.6 — Corrección de Playwright y navegación accesible
 
 - El botón **Comprobantes** tiene un nombre accesible estable, aunque muestre el número de documentos; el contador sigue visible.
 - La navegación activa utiliza `aria-current="page"`, lo que facilita su interpretación por tecnologías de asistencia.
@@ -173,7 +173,7 @@ npm run dist:win
 El instalador se guardará en:
 
 ```text
-release/ComprobantesElectronicosCR-Setup-1.4.5-x64.exe
+release/ComprobantesElectronicosCR-Setup-1.4.6-x64.exe
 ```
 
 El identificador interno es `cr.comprobanteselectronicoscr.desktop`; **no** es el identificador de FacturaCR. El instalador no está firmado digitalmente. Windows SmartScreen puede advertir sobre un editor desconocido.
@@ -345,3 +345,12 @@ git add package-lock.json
 ```
 
 Después de subir el lockfile y verificar la instalación, se recomienda cambiar los workflows de `npm install` a `npm ci`.
+
+
+### Cupones y combustible con total fiscal cero (v1.4.6)
+
+- El XML puede declarar venta positiva, descuento completo y `TotalComprobante = 0`. El total fiscal permanece en cero.
+- Si `TotalNoSujeto` y el pago con `MedioPagoOtros = Cupón` corresponden a la venta/descuento, la aplicación muestra la referencia documental, sin sumarla al gasto ni al IVA.
+- Solo para documentos clasificados como **gasto administrativo**, se puede pulsar **Registrar importe del cupón como gasto manual** y confirmar después de comprobar el soporte contable.
+- El importe manual afecta exclusivamente al reporte de gastos; el IVA, los totales y los documentos originales no se recalculan.
+- Una referencia de cupón no demuestra gasto efectivamente soportado o deducibilidad fiscal.

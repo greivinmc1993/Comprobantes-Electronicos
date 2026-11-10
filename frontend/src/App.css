@@ -574,3 +574,11 @@ h1,h2,h3,p {margin-top:0}
 .detail-gasto-admin{border:1px solid #bde7d2;border-radius:12px;background:#effbf5;padding:14px;display:grid;gap:5px;margin-top:12px;color:#115e43}
 .detail-gasto-admin strong{font-size:25px;overflow-wrap:anywhere}
 .detail-gasto-admin small{line-height:1.5;color:#346857}
+
+/* Referencia informativa de cupones sin importe fiscal: no es un dato contable automático. */
+.cupon-referencia { display:flex; flex-direction:column; gap:6px; margin:14px 0; }
+.cupon-referencia strong { font-size:1.05rem; }
+.cupon-confirmacion { border:1px solid #bfdbfe; background:#eff6ff; border-radius:12px; padding:14px; margin:12px 0; display:grid; gap:10px; }
+.cupon-confirmacion p { margin:0; font-size:.88rem; color:#21415f; line-height:1.5; }
+.cupon-confirmacion .btn { justify-self:start; max-width:100%; white-space:normal; text-align:left; }
+@media (max-width:580px) { .cupon-confirmacion .btn { width:100%; justify-content:center; } }

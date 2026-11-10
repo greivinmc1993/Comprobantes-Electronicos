@@ -285,22 +285,22 @@ export function csvGastosAdministrativos(perfil,docs) {
   const {filas}=resumenGastosAdministrativos(docs);
   descargarCSV(`Gastos_Administrativos_${sufijo(perfil)}.csv`,
     ['Empresa','Fecha','Tipo','Emisor','Identificación emisor','Clave','Monto gasto sin IVA CRC',
-     'Base gravada IVA CRC','IVA neto CRC','Total XML CRC','Monto manual','Revisar total cero','Archivo'],
-    filas.map(({documento:f,montoGasto,baseGravadaIVA,iva,totalXML,manual,requiereRevision})=>[
+     'Base gravada IVA CRC','IVA neto CRC','Total XML CRC','Monto manual','Revisar total cero','Referencia medio pago XML CRC (no sumada)','Archivo'],
+    filas.map(({documento:f,montoGasto,baseGravadaIVA,iva,totalXML,manual,requiereRevision,referenciaCupon})=>[
       perfil.nombre,fechaCorta(f.fecha),f.tipoDocumento,f.emisor?.nombre||f.comercio||'',
       f.emisor?.identificacion?.numero||'',f.clave||'',csvMonto(montoGasto),csvMonto(baseGravadaIVA),
-      csvMonto(iva),csvMonto(totalXML),manual?'Sí':'No',requiereRevision?'Sí':'No',f.nombreArchivo||''
+      csvMonto(iva),csvMonto(totalXML),manual?'Sí':'No',requiereRevision?'Sí':'No',referenciaCupon?csvMonto(referenciaCupon.monto):'',f.nombreArchivo||''
     ]));
 }
 export function excelGastosAdministrativos(perfil,docs) {
   const {filas}=resumenGastosAdministrativos(docs);
   descargarExcel(`Gastos_Administrativos_${sufijo(perfil)}.xlsx`,'Gastos administrativos',
     ['Fecha','Tipo','Emisor','Clave','Monto gasto sin IVA CRC','Base gravada IVA CRC',
-     'IVA neto CRC','Total XML CRC','Monto manual','Revisar total cero'],
-    filas.map(({documento:f,montoGasto,baseGravadaIVA,iva,totalXML,manual,requiereRevision})=>[
+     'IVA neto CRC','Total XML CRC','Monto manual','Revisar total cero','Referencia medio pago XML CRC (no sumada)'],
+    filas.map(({documento:f,montoGasto,baseGravadaIVA,iva,totalXML,manual,requiereRevision,referenciaCupon})=>[
       fechaCorta(f.fecha),f.tipoDocumento,f.emisor?.nombre||f.comercio||'',f.clave||'',
-      montoGasto,baseGravadaIVA,iva,totalXML,manual?'Sí':'No',requiereRevision?'Sí':'No'
-    ]),[4,5,6,7]);
+      montoGasto,baseGravadaIVA,iva,totalXML,manual?'Sí':'No',requiereRevision?'Sí':'No',referenciaCupon?.monto??null
+    ]),[4,5,6,7,10]);
 }
 export function pdfGastosAdministrativos(perfil,docs) {
   const resumen=resumenGastosAdministrativos(docs);
@@ -308,7 +308,7 @@ export function pdfGastosAdministrativos(perfil,docs) {
   pdf.setTextColor(...AZUL);pdf.setFont('helvetica','bold');pdf.setFontSize(10);
   pdf.text(`Gastos sin IVA: ${crcPdf(resumen.totalGastos)}   |   IVA real: ${crcPdf(resumen.totalIVA)}`,14,57);
   pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(...GRIS);
-  pdf.text('Importes manuales son referencias contables, no modifican el XML ni prueban deducibilidad.',14,64);
+  pdf.text('Importes manuales y medios de pago: referencias, no prueban deducibilidad.',14,64);
   if (resumen.pendientesRevision) pdf.text(`${resumen.pendientesRevision} documentos con total XML cero requieren revisión del monto.`,14,69);
   tablaPDF(pdf,['Fecha','Emisor','Gasto sin IVA CRC','Base IVA CRC','IVA CRC','Manual'],
     resumen.filas.map(({documento:f,montoGasto,baseGravadaIVA,iva,manual})=>[
