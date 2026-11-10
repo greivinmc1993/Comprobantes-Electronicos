@@ -1,93 +1,121 @@
-# Dependencias
-node_modules/
+# ============================================================
+# ComprobantesElectronicosCR | React + Vite + Electron + SQLite
+# Subir codigo fuente, pruebas, recursos y GitHub Actions.
+# NO subir datos fiscales, bases reales ni archivos generados.
+# ============================================================
 
-# Compilaciones e instaladores
-/dist/
-/release/
-/out/
-/build-output/
+# 1. Dependencias y caches de Node / Vite
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.vite/
+.cache/
+.eslintcache
+*.tsbuildinfo
+
+# 2. Compilaciones y paquetes de Electron / NSIS
+# IMPORTANTE: NO ignorar build/; contiene iconos y sidebar.bmp.
+dist/
+release/
+out/
+packaged/
 *.exe
 *.msi
 *.msix
 *.appx
-*.dmg
-*.AppImage
 *.blockmap
-*.map
+*.nsis.7z
+*.zip
+*.7z
 
-# IMPORTANTE: build/ NO se ignora: contiene icon.ico e icon.png
-
-# Bases de datos y archivos auxiliares de SQLite
-/data/
+# 3. Bases de datos y datos de clientes (SQLite)
 *.sqlite
 *.sqlite3
+*.sqlite-*
+*.sqlite3-*
 *.db
 *.db3
-*.sqlite-shm
-*.sqlite-wal
-*.db-shm
-*.db-wal
-
-# Respaldos y exportaciones locales
-/backups/
-/respaldos/
-/exports/
-/exportaciones/
-*.bak
-*.backup
+*.db-*
+*.db3-*
+*.db-journal
+*.sqlite-journal
 *.sql.gz
-*.zip
+data/
+database-data/
+backups/
+respaldos/
+copias-seguridad/
+imports/
+importaciones/
+documentos-privados/
 
-# Fixture de QA: imprescindible para validar actualización 0.6.34 -> versiones actuales.
-# Mantener los demás ZIP fuera del repositorio.
-!tests/fixtures/FacturaCR_v0.6.34_baseline.zip
+# 4. Comprobantes reales y exportaciones
+*.xml
+*.pdf
+*.csv
+*.xlsx
+*.xls
+# Se permiten SOLO XML/PDF/CSV sintéticos para pruebas versionadas.
+!tests/fixtures/**/*.xml
+!tests/fixtures/**/*.pdf
+!tests/fixtures/**/*.csv
+!e2e/fixtures/**/*.xml
+!e2e/fixtures/**/*.pdf
+!e2e/fixtures/**/*.csv
 
-# Variables de entorno y credenciales
+# 5. Secretos, variables de entorno y firmas
 .env
 .env.*
 !.env.example
+!.env.sample
+.npmrc
 *.pem
 *.key
 *.p12
 *.pfx
-*.p8
 *.jks
 *.keystore
-*.crt
-*.cer
-*.p7b
-*.p7c
-*.mobileprovision
-*.secrets.json
 
-# Logs y temporales
-*.log
+# 6. QA: salidas generadas, cobertura y capturas temporales
+qa-results/
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# 7. Logs, archivos temporales y respaldos manuales
 logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.tmp
 *.temp
+*.bak
+*.backup
+*.old
+*.orig
 *.swp
 *.swo
 *~
-.cache/
-.tmp/
 tmp/
 temp/
 
-# Configuración local de editores y SO
-.vscode/*
-!.vscode/extensions.json
+# 8. Configuraciones locales del editor y del sistema
+.vscode/
 .idea/
+*.suo
+*.user
+*.sln.docstates
 .DS_Store
 Thumbs.db
 Desktop.ini
 
-# Cobertura y pruebas
-coverage/
-.nyc_output/
-
-# Configuración local de Electron
-.electron/
+# Se deben versionar: package.json, package-lock.json, README.md,
+# .github/workflows/, tests/, e2e/, backend/, frontend/, electron/,
+# build/icons/ y build/installer/.

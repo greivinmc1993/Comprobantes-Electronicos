@@ -1,27 +1,80 @@
-name: QA FacturaCR
+name: QA - Pruebas integrales
 
 on:
   push:
+    branches: [main, develop]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 8 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  unit-integration-build:
-    name: QA Node 22 + compilación React
+  pruebas-backend:
+    name: API, XML, SQLite y QA (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v4
+      - name: Instalar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # El ZIP original no tenía package-lock.json. Después de crear y subir
+      # ese archivo se recomienda sustituir npm install por npm ci.
+      - name: Instalar dependencias nativas y web
+        run: npm install --no-audit --no-fund
+      - name: Revisar sintaxis
+        run: npm run check:syntax
+      - name: Pruebas unitarias e integrales con reporte JUnit
+        run: npm run test:ci
+      - name: Compilar React con Vite
+        run: npm run build
+      - name: Comprobar artefactos de la interfaz
+        run: npm run check:package
+      - name: Adjuntar resultados JUnit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-junit-${{ matrix.os }}
+          path: qa-results/*.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  pruebas-interfaz:
+    name: QA visual React - Chromium
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-      - name: Instalar dependencias sin descargar binario Electron
-        run: npm ci --no-audit --no-fund
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      - name: Comprobar fixture version anterior
-        run: node -e "require('node:fs').accessSync('tests/fixtures/FacturaCR_v0.6.34_baseline.zip')"
-      - name: Cálculos, SQLite temporal, validaciones y sintaxis
-        run: npm test
-      - name: Compilar React/Vite
-        run: npm run build
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Probar escritorio y vista móvil
+        run: npm run test:e2e
+      - name: Publicar capturas, trazas, HTML y JUnit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-interfaz-playwright
+          path: |
+            qa-results/*.xml
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
