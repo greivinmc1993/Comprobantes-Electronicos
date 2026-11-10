@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.3-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.4-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -32,9 +32,20 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Dólares a colones:** consulta la **venta de referencia BCCR a través de Hacienda** según fecha de emisión; usa una cotización oficial guardada o, si no hay conectividad, la declarada en el XML con advertencia. Conserva la fuente y la tasa aplicada.
 - **Panel general:** indicadores y gráficos filtrados por mes, año, períodos rápidos o fechas personalizadas.
 - **Reportes:** PDF, CSV separado por `;` y Excel, siempre con el contexto del perfil y los filtros elegidos.
+- **Gastos administrativos:** cada comprobante puede marcarse individualmente como gasto; su base de gasto sin IVA, base gravada para IVA y el impuesto declarado se muestran por separado. Existe reporte específico PDF/CSV/Excel, sin modificar el IVA del Panel general.
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
+
+## Novedades v1.4.4 — Gastos administrativos y facturas de combustible
+
+- Casilla **«Gasto adm.»** en la tabla de comprobantes y opción equivalente en el detalle.
+- Clasificación guardada en SQLite por empresa y por XML, preservada en la Papelera, su restauración y los respaldos.
+- Nuevo apartado **Gastos administrativos**, con filtro por fecha, resumen de gasto sin IVA, base gravada para IVA y **IVA realmente declarado**. Reportes PDF, CSV y Excel.
+- Si una factura (por ejemplo, combustible) declara **TotalComprobante = 0**, el programa **no altera ni supone** el total del XML. Permite indicar explícitamente un **monto manual de gasto sin IVA** solo para el reporte administrativo y muestra una advertencia.
+- Ejemplo: XML con TotalVenta=30.003, TotalDescuentos=30.003, TotalComprobante=0. Su total fiscal seguirá en cero. Si revisas el comprobante y confirmas un gasto de 30.003, puedes introducir ese importe manualmente para los reportes de gastos, sin modificar impuestos ni historial de IVA.
+- La marca de gasto **no significa automáticamente deducibilidad fiscal**. Los ajustes manuales quedan en el registro de auditoría y se distinguen de los importes del XML.
+- Pruebas QA nuevas con datos sintéticos: importes manuales, cero IVA, notas de crédito, aislamiento entre empresas, restauración y Playwright. Los tests se incluyen automáticamente en GitHub Actions.
 
 ## Novedades v1.4.3 — Correcciones QA para GitHub Actions
 
@@ -153,7 +164,7 @@ npm run dist:win
 El instalador se guardará en:
 
 ```text
-release/ComprobantesElectronicosCR-Setup-1.4.3-x64.exe
+release/ComprobantesElectronicosCR-Setup-1.4.4-x64.exe
 ```
 
 El identificador interno es `cr.comprobanteselectronicoscr.desktop`; **no** es el identificador de FacturaCR. El instalador no está firmado digitalmente. Windows SmartScreen puede advertir sobre un editor desconocido.

@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('comprobantesDesktop',Object.freeze({
   actualizarPerfil:(id,datos)=>ipcRenderer.invoke('comprobanteselectronicoscr:editar-perfil',id,datos),
   eliminarPerfil:(id,confirmacion)=>ipcRenderer.invoke('comprobanteselectronicoscr:eliminar-perfil',id,confirmacion),
   listar:perfilId=>ipcRenderer.invoke('comprobanteselectronicoscr:listar',perfilId),
+  marcarGastoAdministrativo:(perfilId,documentoId,habilitado,montoManual)=>ipcRenderer.invoke(
+    'comprobanteselectronicoscr:marcar-gasto-administrativo',perfilId,documentoId,habilitado,montoManual),
   importar:(perfilId,archivos)=>ipcRenderer.invoke('comprobanteselectronicoscr:importar',perfilId,archivos),
   eliminar:(perfilId,id)=>ipcRenderer.invoke('comprobanteselectronicoscr:eliminar',perfilId,id),
   listarPapelera:()=>ipcRenderer.invoke('comprobanteselectronicoscr:papelera-listar'),

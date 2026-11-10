@@ -65,14 +65,14 @@ function descargarCSV(nombre,encabezados,filas) {
 function sufijo(perfil) {return nombreSeguro(perfil?.nombre);}
 export function csvDocumentos(perfil,docs) {
   descargarCSV(`Comprobantes_${sufijo(perfil)}.csv`,
-    ['Empresa','Tipo','Fecha','Emisor','Cedula emisor','Receptor','Cedula receptor','Consecutivo','Clave','Moneda original','Total original','Cambio aplicado','Fecha TC','Fuente TC','Verificado BCCR','Total CRC','Base IVA por tarifa CRC','IVA CRC','Ajuste neto sin tarifa CRC','Base IVA sin tarifa atribuida CRC','Observaciones fiscales','Archivo'],
+    ['Empresa','Tipo','Fecha','Emisor','Cedula emisor','Receptor','Cedula receptor','Consecutivo','Clave','Moneda original','Total original','Cambio aplicado','Fecha TC','Fuente TC','Verificado BCCR','Total CRC','Base IVA por tarifa CRC','IVA CRC','Ajuste neto sin tarifa CRC','Base IVA sin tarifa atribuida CRC','Observaciones fiscales','Gasto administrativo','Monto gasto manual CRC','Archivo'],
     docs.map(f=>[
       perfil.nombre,f.tipoDocumento,fechaCorta(f.fecha),f.emisor?.nombre||f.comercio,f.emisor?.identificacion?.numero,
       f.receptor?.nombre,f.receptor?.identificacion?.numero,f.consecutivo,f.clave,f.monedaOriginal,
       csvMonto(f.totalOriginal),csvTasa(f.tipoCambioAplicado),f.fechaTipoCambio||'',f.fuenteTipoCambio||'Versión anterior',f.tipoCambioVerificado===true?'Sí':'No',csvMonto(f.total),
       csvMonto(TASAS.reduce((n,t)=>n+numero(f.bases?.[t]),0)),
       csvMonto((f.impuestos||[]).filter(i=>i.codigo==='01').reduce((n,i)=>n+numero(i.monto),0)),
-      csvMonto(f.ajusteNetoSinTarifa),csvMonto(f.baseIVAnoAtribuida),(f.observacionesFiscales||[]).map(o=>o.mensaje).join(' | '),f.nombreArchivo
+      csvMonto(f.ajusteNetoSinTarifa),csvMonto(f.baseIVAnoAtribuida),(f.observacionesFiscales||[]).map(o=>o.mensaje).join(' | '), f.gastoAdministrativo===true?'Sí':'No',f.montoGastoManual==null?'':csvMonto(f.montoGastoManual),f.nombreArchivo
     ])
   );
 }
@@ -116,10 +116,10 @@ function descargarExcel(nombre,hojaNombre,encabezados,filas,columnasCRC=[]) {
 }
 export function excelDocumentos(perfil,docs) {
   descargarExcel(`Comprobantes_${sufijo(perfil)}.xlsx`,'Comprobantes',
-    ['Tipo','Fecha','Emisor','Receptor','Consecutivo','Clave','Moneda','Total original','Cambio aplicado','Fecha TC','Fuente TC','Verificado BCCR','Total CRC','Ajuste neto sin tarifa CRC','Base IVA sin tarifa atribuida CRC','Observaciones fiscales'],
+    ['Tipo','Fecha','Emisor','Receptor','Consecutivo','Clave','Moneda','Total original','Cambio aplicado','Fecha TC','Fuente TC','Verificado BCCR','Total CRC','Ajuste neto sin tarifa CRC','Base IVA sin tarifa atribuida CRC','Observaciones fiscales','Gasto administrativo','Monto gasto manual CRC'],
     docs.map(f=>[f.tipoDocumento,fechaCorta(f.fecha),f.emisor?.nombre||f.comercio,f.receptor?.nombre||'',
       f.consecutivo,f.clave,f.monedaOriginal,numero(f.totalOriginal),numero(f.tipoCambioAplicado),f.fechaTipoCambio||'',f.fuenteTipoCambio||'Versión anterior',f.tipoCambioVerificado===true?'Sí':'No',numero(f.total),numero(f.ajusteNetoSinTarifa),numero(f.baseIVAnoAtribuida),
-      (f.observacionesFiscales||[]).map(o=>o.mensaje).join(' | ')]),[12,13,14]);
+      (f.observacionesFiscales||[]).map(o=>o.mensaje).join(' | '),f.gastoAdministrativo===true?'Sí':'No',f.montoGastoManual==null?'':numero(f.montoGastoManual)]),[12,13,14,17]);
 }
 export function excelIVA(perfil,docs) {
   const r=resumenDatos(docs);
@@ -229,6 +229,8 @@ export function pdfDetalle(perfil,f) {
     ['Fecha referencia TC',f.fechaTipoCambio||'-'],['Fuente tipo de cambio',f.fuenteTipoCambio||'Versión anterior (no registrada)'],
     ['Tasa verificada',f.tipoCambioVerificado===true?'Sí':'No'],
     ['Total original',String(f.totalOriginal??'-')],['Total convertido',crcPdf(f.total)],
+    ['Gasto administrativo',f.gastoAdministrativo===true?'Sí':'No'],
+    ['Monto manual solo para gastos',f.montoGastoManual==null?'No indicado':crcPdf(f.montoGastoManual)],
     ['Ajuste neto sin tarifa',crcPdf(f.ajusteNetoSinTarifa)],
     ['Base IVA sin tarifa atribuida',crcPdf(f.baseIVAnoAtribuida)],
     ['Observaciones fiscales',(f.observacionesFiscales||[]).map(o=>`Línea ${o.linea}: ${o.mensaje}`).join(' | ')||'Ninguna'],
@@ -272,4 +274,46 @@ export function csvComparativoMensual(perfil,docs) {
  descargarCSV(`Comparativo_Mensual_${sufijo(perfil)}.csv`,
  ['Mes','Compras netas CRC','Ventas netas CRC','Diferencia CRC'],
  compararMeses(perfil,docs).map(r=>[r.mes,csvMonto(r.compras),csvMonto(r.ventas),csvMonto(r.ventas-r.compras)]));
+}
+
+
+// v1.4.4 - Gastos administrativos (selección voluntaria; no resta ni duplica IVA general).
+import {resumenGastosAdministrativos} from './gastos-administrativos.mjs';
+export {resumenGastosAdministrativos};
+
+export function csvGastosAdministrativos(perfil,docs) {
+  const {filas}=resumenGastosAdministrativos(docs);
+  descargarCSV(`Gastos_Administrativos_${sufijo(perfil)}.csv`,
+    ['Empresa','Fecha','Tipo','Emisor','Identificación emisor','Clave','Monto gasto sin IVA CRC',
+     'Base gravada IVA CRC','IVA neto CRC','Total XML CRC','Monto manual','Revisar total cero','Archivo'],
+    filas.map(({documento:f,montoGasto,baseGravadaIVA,iva,totalXML,manual,requiereRevision})=>[
+      perfil.nombre,fechaCorta(f.fecha),f.tipoDocumento,f.emisor?.nombre||f.comercio||'',
+      f.emisor?.identificacion?.numero||'',f.clave||'',csvMonto(montoGasto),csvMonto(baseGravadaIVA),
+      csvMonto(iva),csvMonto(totalXML),manual?'Sí':'No',requiereRevision?'Sí':'No',f.nombreArchivo||''
+    ]));
+}
+export function excelGastosAdministrativos(perfil,docs) {
+  const {filas}=resumenGastosAdministrativos(docs);
+  descargarExcel(`Gastos_Administrativos_${sufijo(perfil)}.xlsx`,'Gastos administrativos',
+    ['Fecha','Tipo','Emisor','Clave','Monto gasto sin IVA CRC','Base gravada IVA CRC',
+     'IVA neto CRC','Total XML CRC','Monto manual','Revisar total cero'],
+    filas.map(({documento:f,montoGasto,baseGravadaIVA,iva,totalXML,manual,requiereRevision})=>[
+      fechaCorta(f.fecha),f.tipoDocumento,f.emisor?.nombre||f.comercio||'',f.clave||'',
+      montoGasto,baseGravadaIVA,iva,totalXML,manual?'Sí':'No',requiereRevision?'Sí':'No'
+    ]),[4,5,6,7]);
+}
+export function pdfGastosAdministrativos(perfil,docs) {
+  const resumen=resumenGastosAdministrativos(docs);
+  const pdf=nuevaHojaPDF(perfil,'Gastos administrativos','Documentos marcados manualmente · Filtros de fecha y empresa aplicados');
+  pdf.setTextColor(...AZUL);pdf.setFont('helvetica','bold');pdf.setFontSize(10);
+  pdf.text(`Gastos sin IVA: ${crcPdf(resumen.totalGastos)}   |   IVA real: ${crcPdf(resumen.totalIVA)}`,14,57);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(...GRIS);
+  pdf.text('Importes manuales son referencias contables, no modifican el XML ni prueban deducibilidad.',14,64);
+  if (resumen.pendientesRevision) pdf.text(`${resumen.pendientesRevision} documentos con total XML cero requieren revisión del monto.`,14,69);
+  tablaPDF(pdf,['Fecha','Emisor','Gasto sin IVA CRC','Base IVA CRC','IVA CRC','Manual'],
+    resumen.filas.map(({documento:f,montoGasto,baseGravadaIVA,iva,manual})=>[
+      fechaCorta(f.fecha),String(f.emisor?.nombre||f.comercio||'-').slice(0,40),
+      crcPdf(montoGasto),crcPdf(baseGravadaIVA),crcPdf(iva),manual?'Sí':'No'
+    ]),resumen.pendientesRevision?76:72,{styles:{fontSize:7.4}});
+  cerrarPDF(pdf,`Gastos_Administrativos_${sufijo(perfil)}.pdf`);
 }

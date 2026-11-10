@@ -90,6 +90,11 @@ function crearAPI(base, token, rutaFrontend, servicioTipoCambio) {
     res.json({perfil:perfil.id,importacion:{nuevos,duplicados},errores,avisos});
   });
 
+  // La clasificación voluntaria nunca cambia los impuestos ni el XML original.
+  api.patch('/api/perfiles/:perfilId/documentos/:id/gasto-administrativo',valid(req=>({
+    resultado: base.marcarGastoAdministrativo(Number(req.params.perfilId), Number(req.params.id),
+      req.body?.habilitado, req.body?.montoManual ?? null)
+  })));
   api.delete('/api/perfiles/:perfilId/documentos/:id',valid(req=>({
     eliminado:base.eliminar(Number(req.params.id),Number(req.params.perfilId))
   })));

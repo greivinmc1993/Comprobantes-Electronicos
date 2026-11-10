@@ -191,7 +191,13 @@ function instalarEsquema(db) {
     INSERT OR IGNORE INTO metadatos_aplicacion(clave,valor)
       VALUES ('identidad','cr.comprobanteselectronicoscr.desktop');
   `);
-  db.pragma('user_version = 7');
+  // v1.4.4: clasificación voluntaria; no modifica XML ni valores fiscales.
+  const columnasGasto = new Set(db.pragma('table_info(documentos)').map(c => c.name));
+  if (!columnasGasto.has('gasto_administrativo'))
+    db.exec('ALTER TABLE documentos ADD COLUMN gasto_administrativo INTEGER NOT NULL DEFAULT 0 CHECK(gasto_administrativo IN (0,1))');
+  if (!columnasGasto.has('monto_gasto_manual'))
+    db.exec('ALTER TABLE documentos ADD COLUMN monto_gasto_manual REAL');
+  db.pragma('user_version = 8');
 }
 
 /** Una sola base por usuario Windows, con perfiles independientes dentro de SQLite. */
@@ -212,7 +218,10 @@ function abrirBaseDatos(ruta) {
       @moneda_original,@tipo_cambio_aplicado,@total_original,@total_crc,@nombre_archivo,@xml_original,@datos_json)
     ON CONFLICT(perfil_id, identidad) DO NOTHING
   `);
-  const listar = db.prepare('SELECT id, perfil_id, datos_json FROM documentos WHERE perfil_id = ? ORDER BY fecha DESC, id DESC');
+  const listar = db.prepare('SELECT id, perfil_id, datos_json, gasto_administrativo, monto_gasto_manual FROM documentos WHERE perfil_id = ? ORDER BY fecha DESC, id DESC');
+  const editarClasificacionGasto = db.prepare(`UPDATE documentos
+    SET gasto_administrativo = ?, monto_gasto_manual = ?
+    WHERE id = ? AND perfil_id = ?`);
   const quitarActivo = db.prepare('DELETE FROM documentos WHERE id = ? AND perfil_id = ?');
   const buscarActivoCompleto = db.prepare('SELECT * FROM documentos WHERE id = ? AND perfil_id = ?');
   const agregarAPapelera = db.prepare(`INSERT INTO papelera_documentos
@@ -225,10 +234,11 @@ function abrirBaseDatos(ruta) {
   const quitarPapelera = db.prepare('DELETE FROM papelera_documentos WHERE id = ?');
   const reinsertarActivo = db.prepare(`INSERT INTO documentos
     (perfil_id,identidad,clave,consecutivo,version_xml,tipo,fecha,emisor,receptor,moneda_original,
-     tipo_cambio_aplicado,total_original,total_crc,nombre_archivo,xml_original,datos_json,creado_en)
+     tipo_cambio_aplicado,total_original,total_crc,nombre_archivo,xml_original,datos_json,creado_en,
+     gasto_administrativo,monto_gasto_manual)
     VALUES (@perfil_id,@identidad,@clave,@consecutivo,@version_xml,@tipo,@fecha,@emisor,@receptor,
      @moneda_original,@tipo_cambio_aplicado,@total_original,@total_crc,@nombre_archivo,@xml_original,
-     @datos_json,@creado_en)`);
+     @datos_json,@creado_en,@gasto_administrativo,@monto_gasto_manual)`);
   const contar = db.prepare('SELECT COUNT(*) AS cantidad FROM documentos WHERE perfil_id = ?');
   const crear = db.prepare(`INSERT INTO perfiles(nombre,cedula,correo,telefono,direccion,color)
     VALUES (@nombre,@cedula,@correo,@telefono,@direccion,@color)`);
@@ -547,7 +557,32 @@ function abrirBaseDatos(ruta) {
     },
     listar(perfilId) {
       buscarPerfil(perfilId);
-      return listar.all(perfilId).map(row => ({...JSON.parse(row.datos_json), id:row.id, perfilId: row.perfil_id}));
+      return listar.all(perfilId).map(row => ({...JSON.parse(row.datos_json), id:row.id, perfilId: row.perfil_id,
+        gastoAdministrativo: row.gasto_administrativo === 1,
+        montoGastoManual: row.monto_gasto_manual}));
+    },
+    // Preferencia contable independiente del XML y del cómputo general de IVA.
+    marcarGastoAdministrativo(perfilId, documentoId, habilitado, montoManual = null) {
+      buscarPerfil(perfilId);
+      if (!Number.isSafeInteger(documentoId) || documentoId <= 0 || typeof habilitado !== 'boolean')
+        throw new Error('Identificadores o clasificación inválidos');
+      const fila = buscarActivoCompleto.get(documentoId, perfilId);
+      if (!fila) throw new Error('El documento no pertenece a la empresa seleccionada');
+      let importe = null;
+      if (habilitado && montoManual !== '' && montoManual !== null && montoManual !== undefined) {
+        if (typeof montoManual !== 'number' || !Number.isFinite(montoManual) || montoManual <= 0 || montoManual > 1_000_000_000_000)
+          throw new Error('El monto manual debe ser un número positivo y válido en colones');
+        importe = Math.round(montoManual * 100000) / 100000;
+      }
+      return db.transaction(() => {
+        const result = editarClasificacionGasto.run(habilitado ? 1 : 0, importe, documentoId, perfilId);
+        if (result.changes !== 1) throw new Error('No se pudo actualizar el gasto administrativo');
+        registrar('CLASIFICAR_GASTO_ADMINISTRATIVO', perfilId, {
+          documentoId, habilitado, montoManual: importe,
+          nota: importe !== null ? 'Importe manual solo para reportes; XML original conservado' : null,
+        });
+        return {documentoId, gastoAdministrativo: habilitado, montoGastoManual: importe};
+      })();
     },
     // La eliminación normal siempre es recuperable: mover del historial activo a la papelera.
     enviarPapelera(perfilId, ids) {
@@ -599,9 +634,11 @@ function abrirBaseDatos(ruta) {
           const snapshot=JSON.parse(fila.fila_json);
           const columnas=['identidad','clave','consecutivo','version_xml','tipo','fecha','emisor','receptor',
             'moneda_original','tipo_cambio_aplicado','total_original','total_crc','nombre_archivo',
-            'xml_original','datos_json','creado_en'];
+            'xml_original','datos_json','creado_en','gasto_administrativo','monto_gasto_manual'];
           const datos=Object.fromEntries(columnas.map(c=>[c,snapshot[c]]));
-          try {reinsertarActivo.run({...datos,perfil_id:destino.id});}
+          try {reinsertarActivo.run({...datos,perfil_id:destino.id,
+              gasto_administrativo: Number(snapshot.gasto_administrativo)===1?1:0,
+              monto_gasto_manual: snapshot.monto_gasto_manual??null});}
           catch(error) {
             if(error.code==='SQLITE_CONSTRAINT_UNIQUE' || /UNIQUE constraint failed/.test(error.message)) throw new Error(`El comprobante ${fila.consecutivo||fila.clave||fila.id} ya existe en «${destino.nombre}». No se restauró ningún documento.`);
             throw error;

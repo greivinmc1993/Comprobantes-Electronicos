@@ -99,3 +99,11 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - Node ESM Windows/Linux: `pathToFileURL` para importar módulos `.mjs` en pruebas de asignación masiva.
 - Chromium: selector estricto por nivel de encabezado para la sección de Bitácora.
 - Acciones CI: los trabajos no deben ocultar fallos, se conservan JUnit y capturas.
+
+## Pruebas nuevas v1.4.4 — Gastos administrativos
+
+- `tests/qa-v144-gastos-administrativos.test.cjs`: IVA real inalterado, gasto sin IVA, factura sin IVA, total XML cero, monto manual, notas de crédito con signo negativo y reportes.
+- `tests/qa-v144-gastos-sqlite.integration.test.cjs`: persistencia por perfil, rechazo de otra empresa, validación del importe manual, papelera y restauración; requiere `better-sqlite3` instalado en GitHub Actions.
+- `e2e/aplicacion.spec.cjs`: cambio de la casilla y visibilidad de reportes en Chromium; prueba del aviso para documentos con total XML cero.
+- Auditoría y base de datos original no deben modificarse para corregir el importe de una factura. La clasificación administrativa jamás debe excluir IVA real del resumen general.
+- Validación manual requerida: factura de combustible real y su XML para distinguir un total efectivamente cero de un error del emisor. No incluir datos reales en fixtures de GitHub.

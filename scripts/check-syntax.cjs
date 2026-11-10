@@ -6,7 +6,7 @@ const targets=['backend','electron','tests','scripts'];
 const files=targets.flatMap(dir=>fs.readdirSync(path.join(root,dir))
   .filter(name=>/\.(?:js|cjs|mjs)$/.test(name))
   .map(name=>path.join(root,dir,name)));
-files.push(path.join(root,'frontend/src/periodos.mjs'),path.join(root,'frontend/src/export-utils.mjs'),path.join(root,'vite.config.mjs'));
+files.push(path.join(root,'frontend/src/periodos.mjs'),path.join(root,'frontend/src/export-utils.mjs'),path.join(root,'frontend/src/gastos-administrativos.mjs'),path.join(root,'vite.config.mjs'));
 let errors=0;
 for(const file of files){
  if(file===__filename)continue;

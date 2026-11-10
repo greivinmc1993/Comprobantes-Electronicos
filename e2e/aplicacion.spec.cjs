@@ -12,10 +12,16 @@ test.beforeEach(async({page})=>{
    tipoDocumento:'Factura electrónica',versionXML:'4.4',fecha:'2026-11-02T10:00:00',
    total:113,monedaOriginal:'CRC',tipoCambioAplicado:1,totalOriginal:113,comercio:'Comercio ficticio',
    emisor:{nombre:'Comercio ficticio',identificacion:{numero:'3101111111'}},receptor:{nombre:'Cliente ficticio'},
-   bases:{'13':100},impuestos:[{codigo:'01',tarifa:13,monto:13}],detalle:[]};
+   bases:{'13':100},impuestos:[{codigo:'01',tarifa:13,monto:13}],resumen:{totalVenta:100,totalVentaNeta:100,totalGravado:100,totalImpuesto:13},detalle:[],gastoAdministrativo:false,montoGastoManual:null};
   const estado=id=>({perfil:perfiles.find(p=>p.id===id),facturas:id===1?[factura]:[],iva:{'13':id===1?13:0},base:{'13':id===1?100:0},totalNeto:id===1?113:0,documentos:{},errores:[]});
   window.comprobantesDesktop={
    listarPerfiles:async()=>({perfiles:[...perfiles]}),listar:async(id)=>estado(id),
+   marcarGastoAdministrativo:async(perfilId,docId,habilitado,montoManual)=>{
+     if(perfilId!==1 || docId!==1) throw new Error('No pertenece a la empresa');
+     factura.gastoAdministrativo=habilitado;
+     factura.montoGastoManual=habilitado?(montoManual??null):null;
+     return {resultado:{documentoId:docId,gastoAdministrativo:habilitado,montoGastoManual:factura.montoGastoManual}};
+   },
    crearPerfil:async(p)=>{const perfil={...p,id:perfiles.length+1,cantidad:0};perfiles.push(perfil);return {perfil};},
    actualizarPerfil:async(id,p)=>{const perfil=perfiles.find(x=>x.id===id);Object.assign(perfil,p);return {perfil};},
    eliminarPerfil:async()=>({documentosAfectados:0,respaldo:'/mock/backup.sqlite'}),
@@ -128,4 +134,48 @@ test('Vista previa muestra advertencia de base IVA multitarifa no atribuida sin 
  await expect(modal.getByText('fiscal-sintetico.xml')).toBeVisible();
  await modal.getByRole('button',{name:'Cancelar'}).click();
  await expect(modal).toBeHidden();
+});
+
+
+test('Gasto administrativo: checkbox, reporte y permanencia del IVA en el panel',async({page})=>{
+ await page.getByRole('button',{name:'Comprobantes',exact:true}).click();
+ const checkbox=page.getByRole('checkbox',{name:/Marcar como gasto administrativo/});
+ await checkbox.check();
+ await expect(checkbox).toBeChecked();
+ await page.getByRole('button',{name:'Gastos administrativos',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Reporte de gastos administrativos'})).toBeVisible();
+ await expect(page.locator('.gastos-resumen')).toContainText('₡100,00');
+ await expect(page.locator('.gastos-resumen')).toContainText('₡13,00');
+ await page.getByRole('button',{name:'Panel general'}).click();
+ await expect(page.locator('.iva-panel')).toContainText('₡13,00');
+});
+
+test('Total XML cero: importe manual solo afecta al reporte de gastos',async({page})=>{
+ await page.evaluate(()=>{
+   // El estado se almacena en el objeto de la prueba, no se envían datos fiscales reales.
+   // El puente simulado se modifica para presentar un XML de total cero.
+   const anterior=window.comprobantesDesktop.listar;
+   window.comprobantesDesktop.listar=async id=>{
+     const estado=await anterior(id);
+     if(id===1)estado.facturas=estado.facturas.map(f=>({...f,total:0,totalOriginal:0,
+       resumen:{totalVenta:30003,totalDescuentos:30003,totalVentaNeta:0,totalGravado:0,totalImpuesto:0},
+       impuestos:[],gastoAdministrativo:f.gastoAdministrativo,montoGastoManual:f.montoGastoManual}));
+     return estado;
+   };
+ });
+ // Forzar que React vuelva a consultar la API simulada.
+ await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Norte/}).click();
+ await page.getByRole('menuitemradio',{name:/Empresa Ficticia Sur/}).click();
+ await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Sur/}).click();
+ await page.getByRole('menuitemradio',{name:/Empresa Ficticia Norte/}).click();
+ await page.getByRole('button',{name:'Comprobantes',exact:true}).click();
+ await page.locator('tr.fila-interactiva').first().click();
+ const dlg=page.getByRole('dialog',{name:'Detalle de comprobante'});
+ await expect(dlg.getByRole('note')).toContainText('Este XML declara total ₡0,00');
+ await dlg.getByRole('checkbox',{name:/Guardar este comprobante como gasto administrativo/}).check();
+ await dlg.getByPlaceholder(/Ej\.: 30003/).fill('30003');
+ await dlg.getByRole('button',{name:'Guardar monto'}).click();
+ await dlg.getByTitle('Cerrar').click();
+ await page.getByRole('button',{name:'Gastos administrativos',exact:true}).click();
+ await expect(page.locator('.gastos-resumen')).toContainText(/30[.,\s]003[.,\s]00/);
 });

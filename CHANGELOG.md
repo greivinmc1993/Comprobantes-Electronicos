@@ -1,5 +1,13 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.4 — Gastos administrativos
+
+- Marca por documento en SQLite y reporte separado de gasto sin IVA, base gravada para IVA e IVA real, sin alterar el XML.
+- Campo manual opcional para documentos con total cero, claramente separado del importe fiscal original.
+- Exportaciones PDF, CSV y Excel; filtros por empresa y período.
+- Clasificación conservada en Papelera, restauración y copias SQLite; auditoría de cambios.
+- Nuevas pruebas unitarias, integración nativa SQLite (CI) y Playwright.
+
 ## 1.4.3 — QA multiplataforma (GitHub Actions)
 
 - **Linux / API:** la prueba de borrado de una nota de crédito desde una empresa ajena ahora comprueba el rechazo HTTP 400, el mensaje de error y que no se alteran los datos de ninguna de las dos empresas.

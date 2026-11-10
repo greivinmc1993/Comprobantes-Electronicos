@@ -6,7 +6,8 @@ import CentroGestion from './components/CentroGestion';
 import VistaPrevia from './components/VistaPrevia';
 import {
   TASAS,TIPOS,numero,crc,fechaCorta,resumenDatos,csvDocumentos,csvIVA,csvComercios,csvLineas,
-  pdfResumen,pdfComercios,pdfIVA,pdfDetalle,excelDocumentos,excelIVA,excelComercios,excelLineas
+  pdfResumen,pdfComercios,pdfIVA,pdfDetalle,excelDocumentos,excelIVA,excelComercios,excelLineas,
+  csvGastosAdministrativos,excelGastosAdministrativos,pdfGastosAdministrativos,resumenGastosAdministrativos
 } from './reportes';
 import './App.css';
 import {fechaLocal,obtenerRangoPanel,filtrarPorPeriodo,mismoMes,etiquetaRango} from './periodos.mjs';
@@ -16,6 +17,7 @@ const PALETA=['#2563EB','#0891B2','#0F766E','#7C3AED','#D97706','#DC5462'];
 const NAVEGACION=[
   {id:'inicio',titulo:'Panel general',icono:'grid'},
   {id:'documentos',titulo:'Comprobantes',icono:'receipt'},
+  {id:'gastos',titulo:'Gastos administrativos',icono:'wallet'},
   {id:'importacion',titulo:'Importación inteligente',icono:'importar'},
   {id:'contabilidad',titulo:'Compras y ventas',icono:'wallet'},
   {id:'hacienda',titulo:'Mensajes Hacienda',icono:'shield'},
@@ -54,13 +56,17 @@ function Campo({titulo,children}) {return <label className="campo"><span>{titulo
 function Boton({children,icono,clase='btn-primary',...props}) {
   return <button className={`btn ${clase}`} {...props}>{icono&&<Icon name={icono} size={17}/>}<span>{children}</span></button>;
 }
-function TablaComprobantes({docs,alSeleccionar,compacta=false,marcados=[],alMarcar,alMarcarPagina}) {
+function TablaComprobantes({docs,alSeleccionar,compacta=false,marcados=[],alMarcar,alMarcarPagina,alClasificar}) {
   if(!docs.length) return <Vacio titulo="No se encontraron comprobantes" descripcion="Prueba con otros filtros o importa documentos XML para esta empresa."/>;
   return <div className="table-scroll"><table className="data-table">
-    <thead><tr>{alMarcar&&<th className="col-seleccion"><input type="checkbox" aria-label="Seleccionar comprobantes de esta página" checked={docs.length>0&&docs.every(f=>marcados.includes(f.id))} onChange={e=>alMarcarPagina(docs.map(f=>f.id),e.target.checked)}/></th>}<th>Documento</th><th>Emisor / Receptor</th><th>Fecha</th><th>Consecutivo</th><th className="numero-tabla">Total neto</th><th aria-label="Detalle"/></tr></thead>
+    <thead><tr>{alMarcar&&<th className="col-seleccion"><input type="checkbox" aria-label="Seleccionar comprobantes de esta página" checked={docs.length>0&&docs.every(f=>marcados.includes(f.id))} onChange={e=>alMarcarPagina(docs.map(f=>f.id),e.target.checked)}/></th>}<th>Documento</th>{alClasificar&&<th className="col-gasto">Gasto adm.</th>}<th>Emisor / Receptor</th><th>Fecha</th><th>Consecutivo</th><th className="numero-tabla">Total neto</th><th aria-label="Detalle"/></tr></thead>
     <tbody>{docs.map(f=><tr key={f.id} onClick={()=>alSeleccionar(f)} className="fila-interactiva" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'&&e.target===e.currentTarget) alSeleccionar(f);}}>
       {alMarcar&&<td className="col-seleccion" onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={`Seleccionar comprobante ${f.consecutivo||f.clave||f.id}`} checked={marcados.includes(f.id)} onChange={e=>alMarcar(f.id,e.target.checked)}/></td>}
       <td><span className={cssTipo(f.tipoDocumento)}>{rotuloTipo(f.tipoDocumento)}</span><small className="texto-secundario bloque">{f.versionXML?`XML ${f.versionXML}`:'XML'}</small></td>
+      {alClasificar&&<td className="col-gasto" onClick={e=>e.stopPropagation()}>
+        <input type="checkbox" aria-label={`Marcar como gasto administrativo ${f.consecutivo||f.clave||f.id}`}
+          checked={f.gastoAdministrativo===true} onChange={e=>alClasificar(f,e.target.checked)} />
+      </td>}
       <td className="celda-negocio"><strong title={f.emisor?.nombre||f.comercio}>{f.emisor?.nombre||f.comercio||'Emisor no identificado'}</strong><small title={f.receptor?.nombre||''}>{f.receptor?.nombre||'Receptor no identificado'}</small></td>
       <td className="no-wrap">{fechaCorta(f.fecha)}</td>
       <td><code className="consecutivo" title={f.consecutivo||f.clave}>{f.consecutivo||'—'}</code></td>
@@ -170,6 +176,7 @@ export default function App() {
   const [cargando,setCargando]=useState(false);
   const [aviso,setAviso]=useState(null);
   const [seleccionado,setSeleccionado]=useState(null);
+  const [gastoManualInput,setGastoManualInput]=useState('');
   const [marcados,setMarcados]=useState([]);
   const [marcadosPapelera,setMarcadosPapelera]=useState([]);
   const [papelera,setPapelera]=useState([]);
@@ -282,6 +289,8 @@ export default function App() {
   const rangoPanel=useMemo(()=>obtenerRangoPanel(filtroPanel),[filtroPanel]);
   const documentosPanel=useMemo(()=>filtrarPorPeriodo(todos,rangoPanel),[todos,rangoPanel]);
   const resumenPanel=useMemo(()=>resumenDatos(documentosPanel),[documentosPanel]);
+  const gastosPanel=useMemo(()=>resumenGastosAdministrativos(documentosPanel),[documentosPanel]);
+  const gastosFiltrados=useMemo(()=>resumenGastosAdministrativos(filtrados),[filtrados]);
   const resumenReportes=useMemo(()=>resumenDatos(filtrados),[filtrados]);
   const resumen=seccion==='inicio'?resumenPanel:resumenReportes;
   const docsVista=seccion==='inicio'?documentosPanel:filtrados;
@@ -504,12 +513,37 @@ export default function App() {
     try{await desktop.moverDocumento(perfilId,seleccionado.id,dest);await recargar();await recuperarPerfiles();setSeleccionado(null);setDestinoId('');mensaje('Comprobante movido a la empresa seleccionada.');}
     catch(err){mensaje(err.message,'error');}finally{setCargando(false);}
   };
+  const guardarGastoAdministrativo=async (documento,habilitado,montoTexto=null)=>{
+    if(!desktop?.marcarGastoAdministrativo) return mensaje('Actualiza la aplicación de escritorio para clasificar gastos.','error');
+    let montoManual=null;
+    const valor=String(montoTexto??'').trim().replace(',','.');
+    if(valor){
+      montoManual=Number(valor);
+      if(!Number.isFinite(montoManual)||montoManual<=0||montoManual>1_000_000_000_000){
+        return mensaje('El importe manual debe ser un número positivo válido en CRC.','error');
+      }
+    }
+    setCargando(true);
+    try {
+      await desktop.marcarGastoAdministrativo(perfilId,documento.id,habilitado,montoManual);
+      const actualizados=await recargar();
+      const actualizado=(actualizados.facturas||[]).find(f=>f.id===documento.id);
+      if(seleccionado?.id===documento.id && actualizado) setSeleccionado(actualizado);
+      mensaje(habilitado?'Comprobante incluido en gastos administrativos. El IVA general no se modifica.':'Comprobante retirado de gastos administrativos.');
+    }catch(error){mensaje(error.message||'No se pudo guardar el gasto','error');}
+    finally {setCargando(false);}
+  };
+  const ejecutarReporteGastos=fn=>{
+    if(!gastosFiltrados.cantidad) return mensaje('Marca al menos un comprobante como gasto administrativo.','warn');
+    try{fn(perfil,filtrados);mensaje(`Reporte de gastos generado para «${perfil.nombre}».`);}
+    catch(error){mensaje(`No se pudo exportar: ${error.message}`,'error');}
+  };
   const ejecutarReporte=fn=>{
     if(!filtrados.length) return mensaje('No hay comprobantes para exportar con los filtros actuales.','warn');
     try{fn(perfil,filtrados);mensaje(`Reporte generado para «${perfil.nombre}» (${filtrados.length} documentos).`);}
     catch(err){mensaje(`No se pudo exportar: ${err.message}`,'error');}
   };
-  const abrirDetalle=f=>{setSeleccionado(f);setDestinoId('');setLimiteLineas(30);};
+  const abrirDetalle=f=>{setSeleccionado(f);setGastoManualInput(f.montoGastoManual == null ? '' : String(f.montoGastoManual));setDestinoId('');setLimiteLineas(30);};
   const abrirDesdePanel=destino=>{
     if(!rangoPanel.valido) return mensaje('Corrige el rango de fechas del panel general antes de continuar.','warn');
     setTextoBuscar('');setFiltroTipo('TODOS');setFiltroComercio('TODOS');setFiltroIVA('TODOS');
@@ -546,7 +580,7 @@ export default function App() {
     <div className="workspace">
       <header className="topbar"><div className="migas"><span>ComprobantesElectronicosCR</span><Icon name="chevron" size={13}/><strong>{NAVEGACION.find(n=>n.id===seccion)?.titulo}</strong></div><div className="topbar-right"><span className="local-status"><i/> Base de datos local</span><div className="top-avatar" style={{background:perfil.color}}>{perfil.nombre.slice(0,1).toUpperCase()}</div></div></header>
       <main className="main-content">
-        <div className="page-top"><div><div className="eyebrow">GESTIÓN DE COMPROBANTES · COSTA RICA</div><h1>{seccion==='inicio'?'Panel general':seccion==='documentos'?'Comprobantes':seccion==='papelera'?'Papelera de comprobantes':seccion==='importacion'?'Importación inteligente':seccion==='contabilidad'?'Centro contable':seccion==='hacienda'?'Mensajes de Hacienda':seccion==='auditoria'?'Bitácora de operaciones':seccion==='carpetas'?'Carpetas vigiladas':seccion==='reportes'?'Centro de reportes':seccion==='respaldos'?'Copias de seguridad':seccion==='divisas'?'Tipo de cambio USD':'Perfiles de empresas'}</h1><p>{seccion==='inicio'?'Una vista clara de la facturación y los impuestos de tu empresa.':seccion==='documentos'?'Consulta, filtra y organiza tus archivos electrónicos XML 4.4.':seccion==='papelera'?'Recupera importaciones retiradas del historial, sin alterar las otras empresas.':['importacion','contabilidad','hacienda','auditoria','carpetas'].includes(seccion)?'Herramientas de revisión, trazabilidad y control de comprobantes.':seccion==='reportes'?'Exportaciones con filtros, desglose de IVA y datos en colones.':seccion==='respaldos'?'Protege el historial SQLite de todas tus empresas con copias locales.':seccion==='divisas'?'Referencia oficial BCCR publicada por Hacienda; importes históricos guardados por fecha.':'Administra los documentos de cada empresa por separado.'}</p></div><div className="page-actions">{seccion==='perfiles'?<Boton icono="plus" onClick={()=>abrirPerfil()}>Nueva empresa</Boton>:seccion==='papelera'?<Boton icono="refresh" clase="btn-light" onClick={()=>recargarPapelera()} disabled={cargando}>Actualizar papelera</Boton>:seccion==='respaldos'?<Boton icono="database" onClick={crearRespaldoAhora} disabled={trabajandoRespaldo}>{trabajandoRespaldo?'Creando copia...':'Crear respaldo ahora'}</Boton>:<><Boton clase="btn-light" icono="exportar" title="Ir a los reportes para exportar archivos" onClick={()=>seccion==='inicio'?abrirDesdePanel('reportes'):setSeccion('reportes')}>Exportar</Boton><Boton icono="importar" title="Importar comprobantes XML a la empresa activa" onClick={()=>fileInput.current?.click()} disabled={cargando||!perfilId}>{cargando?'Procesando...':'Importar XML'}</Boton></>}</div></div>
+        <div className="page-top"><div><div className="eyebrow">GESTIÓN DE COMPROBANTES · COSTA RICA</div><h1>{seccion==='inicio'?'Panel general':seccion==='documentos'?'Comprobantes':seccion==='gastos'?'Gastos administrativos':seccion==='papelera'?'Papelera de comprobantes':seccion==='importacion'?'Importación inteligente':seccion==='contabilidad'?'Centro contable':seccion==='hacienda'?'Mensajes de Hacienda':seccion==='auditoria'?'Bitácora de operaciones':seccion==='carpetas'?'Carpetas vigiladas':seccion==='reportes'?'Centro de reportes':seccion==='respaldos'?'Copias de seguridad':seccion==='divisas'?'Tipo de cambio USD':'Perfiles de empresas'}</h1><p>{seccion==='inicio'?'Una vista clara de la facturación y los impuestos de tu empresa.':seccion==='documentos'?'Consulta, filtra y organiza tus archivos electrónicos XML 4.4.':seccion==='gastos'?'Clasifica documentos y consulta gastos sin alterar el IVA original.':seccion==='papelera'?'Recupera importaciones retiradas del historial, sin alterar las otras empresas.':['importacion','contabilidad','hacienda','auditoria','carpetas'].includes(seccion)?'Herramientas de revisión, trazabilidad y control de comprobantes.':seccion==='reportes'?'Exportaciones con filtros, desglose de IVA y datos en colones.':seccion==='respaldos'?'Protege el historial SQLite de todas tus empresas con copias locales.':seccion==='divisas'?'Referencia oficial BCCR publicada por Hacienda; importes históricos guardados por fecha.':'Administra los documentos de cada empresa por separado.'}</p></div><div className="page-actions">{seccion==='perfiles'?<Boton icono="plus" onClick={()=>abrirPerfil()}>Nueva empresa</Boton>:seccion==='papelera'?<Boton icono="refresh" clase="btn-light" onClick={()=>recargarPapelera()} disabled={cargando}>Actualizar papelera</Boton>:seccion==='respaldos'?<Boton icono="database" onClick={crearRespaldoAhora} disabled={trabajandoRespaldo}>{trabajandoRespaldo?'Creando copia...':'Crear respaldo ahora'}</Boton>:<><Boton clase="btn-light" icono="exportar" title="Ir a los reportes para exportar archivos" onClick={()=>seccion==='inicio'?abrirDesdePanel('reportes'):setSeccion('reportes')}>Exportar</Boton><Boton icono="importar" title="Importar comprobantes XML a la empresa activa" onClick={()=>fileInput.current?.click()} disabled={cargando||!perfilId}>{cargando?'Procesando...':'Importar XML'}</Boton></>}</div></div>
         {avisosCambio.length>0&&<div className="alerta aviso-warn" role="status"><Icon name="alert" size={18}/><span>{avisosCambio.length} observación(es) de importación (tipo de cambio o redondeos fiscales). <details><summary>Ver detalles</summary><ul>{avisosCambio.map((aviso,i)=><li key={i}><strong>{aviso.archivo}</strong>: {aviso.mensaje}</li>)}</ul></details><button className="text-button" onClick={()=>setAvisosCambio([])}>Cerrar</button></span></div>}
         <input ref={fileInput} type="file" multiple accept=".xml,application/xml,text/xml" className="oculto" onChange={importar}/>
         {aviso&&<div className={`alerta aviso-${aviso.tipo||'ok'}`} role="status"><Icon name={aviso.tipo==='error'?'alert':'check'} size={18}/><span>{aviso.texto}</span><button title="Cerrar aviso" onClick={()=>setAviso(null)}><Icon name="close" size={16}/></button></div>}
@@ -610,11 +644,17 @@ export default function App() {
           </div>
           <div className="dashboard-grid dashboard-bottom">
             <section className="surface-card recent-panel"><div className="section-head"><div><h2>Comprobantes recientes</h2><p>Últimos movimientos dentro del período</p></div><button className="text-button" onClick={()=>abrirDesdePanel('documentos')}>Ver todos <Icon name="arrow" size={16}/></button></div><TablaComprobantes compacta docs={[...documentosPanel].sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||''))).slice(0,6)} alSeleccionar={abrirDetalle}/></section>
+            <section className="surface-card gastos-indicador" aria-label="Gastos administrativos del período">
+              <div className="section-head"><div><h2>Gastos administrativos</h2><p>Comprobantes marcados en el período</p></div></div>
+              <div className="gastos-indicador-monto">{crc(gastosPanel.totalGastos)}</div>
+              <p>{gastosPanel.cantidad} comprobante(s) clasificado(s) · IVA real {crc(gastosPanel.totalIVA)} incluido en el resumen general</p>
+              <button className="text-button" onClick={()=>abrirDesdePanel('gastos')}>Consultar gastos <Icon name="arrow" size={16}/></button>
+            </section>
             <section className="surface-card iva-panel"><div className="section-head"><div><h2>IVA por tarifa</h2><p>Base e impuesto en colones</p></div></div>{TASAS.map(t=><div className="iva-line" key={t}><div className="iva-label"><span>{t}%</span><strong>{crc(resumen.iva[t])}</strong></div><div className="iva-track"><i style={{width:`${porcentaje(resumen.iva[t],Math.max(1,...Object.values(resumen.iva).map(v=>Math.abs(v))))}%`}}/></div></div>)}<button className="text-button" onClick={()=>abrirDesdePanel('reportes')}>Consultar reporte IVA <Icon name="arrow" size={16}/></button></section>
           </div>
         </>}
 
-        {(seccion==='documentos'||seccion==='reportes')&&<section className="surface-card filtro-panel"><div className="filtros-header"><strong><Icon name="filter" size={18}/> Filtros de información</strong><button className="text-button" disabled={!hayFiltros} onClick={limpiar}>Limpiar filtros <Icon name="close" size={15}/></button></div><div className="filtros-grid">
+        {(seccion==='documentos'||seccion==='reportes'||seccion==='gastos')&&<section className="surface-card filtro-panel"><div className="filtros-header"><strong><Icon name="filter" size={18}/> Filtros de información</strong><button className="text-button" disabled={!hayFiltros} onClick={limpiar}>Limpiar filtros <Icon name="close" size={15}/></button></div><div className="filtros-grid">
           <Campo titulo="Buscar comprobantes"><div className="input-icon"><Icon name="search" size={17}/><input placeholder="Clave, comercio, nombre..." value={textoBuscar} onChange={e=>{setTextoBuscar(e.target.value);setPagina(1);}}/></div></Campo>
           <Campo titulo="Tipo de comprobante"><select value={filtroTipo} onChange={e=>{setFiltroTipo(e.target.value);setPagina(1);}}><option value="TODOS">Todos los tipos</option>{TIPOS.map(t=><option key={t}>{t}</option>)}</select></Campo>
           <Campo titulo="Comercio emisor"><select value={filtroComercio} onChange={e=>{setFiltroComercio(e.target.value);setPagina(1);}}><option value="TODOS">Todos los comercios</option>{comerciosDisponibles.map(t=><option key={t} value={t}>{t}</option>)}</select></Campo>
@@ -634,7 +674,7 @@ export default function App() {
             <Boton icono="trash" clase="btn-danger-light" disabled={!marcados.length||cargando} onClick={()=>abrirOperacionLote('papelera')}>Enviar a Papelera</Boton>
           </div>
         </div>
-        <TablaComprobantes docs={docsPagina} alSeleccionar={abrirDetalle} marcados={marcados} alMarcar={marcar} alMarcarPagina={marcarPagina}/>{filtrados.length>TOTAL_PAGINA&&<div className="paginador"><span>Mostrando {(pagina-1)*TOTAL_PAGINA+1}–{Math.min(pagina*TOTAL_PAGINA,filtrados.length)} de {filtrados.length}</span><div><button disabled={pagina===1} onClick={()=>setPagina(p=>p-1)}>Anterior</button><strong>{pagina} / {totalPaginas}</strong><button disabled={pagina===totalPaginas} onClick={()=>setPagina(p=>p+1)}>Siguiente</button></div></div>}</section>}
+        <TablaComprobantes docs={docsPagina} alSeleccionar={abrirDetalle} marcados={marcados} alMarcar={marcar} alMarcarPagina={marcarPagina} alClasificar={(f,on)=>guardarGastoAdministrativo(f,on,f.montoGastoManual)}/>{filtrados.length>TOTAL_PAGINA&&<div className="paginador"><span>Mostrando {(pagina-1)*TOTAL_PAGINA+1}–{Math.min(pagina*TOTAL_PAGINA,filtrados.length)} de {filtrados.length}</span><div><button disabled={pagina===1} onClick={()=>setPagina(p=>p-1)}>Anterior</button><strong>{pagina} / {totalPaginas}</strong><button disabled={pagina===totalPaginas} onClick={()=>setPagina(p=>p+1)}>Siguiente</button></div></div>}</section>}
 
         {seccion==='papelera'&&<section className="surface-card papelera-panel">
           <div className="section-head"><div><h2>Comprobantes en Papelera <span className="numero-gris">({papelera.length})</span></h2><p>Los documentos de esta lista no se incluyen en los informes ni gráficos. Conservan su XML y se pueden restaurar.</p></div></div>
@@ -661,12 +701,45 @@ export default function App() {
             onVista={async vista=>{setVistaImportacion(vista);setSeccion('importacion');}}
             mostrar={mensaje} actualizar={async()=>{await recargar();await recuperarPerfiles();}}/>}
 
+        {seccion==='gastos'&&<>
+          <section className="surface-card gastos-panel">
+            <div className="section-head"><div><h2>Reporte de gastos administrativos</h2>
+              <p>Solo comprobantes marcados por ti, dentro de la empresa y el rango de fechas seleccionados.</p>
+            </div><span className="chip-neutro">CRC</span></div>
+            <div className="gastos-resumen">
+              <div><span>Comprobantes clasificados</span><strong>{gastosFiltrados.cantidad}</strong></div>
+              <div><span>Monto de gasto sin IVA</span><strong>{crc(gastosFiltrados.totalGastos)}</strong></div>
+              <div><span>Base gravada para IVA</span><strong>{crc(gastosFiltrados.totalBaseIVA)}</strong></div>
+              <div><span>IVA declarado de esos gastos</span><strong>{crc(gastosFiltrados.totalIVA)}</strong></div>
+            </div>
+            <div className="gastos-acciones">
+              <Boton clase="btn-light" icono="download" disabled={!gastosFiltrados.cantidad} onClick={()=>ejecutarReporteGastos(csvGastosAdministrativos)}>CSV</Boton>
+              <Boton clase="btn-light" icono="download" disabled={!gastosFiltrados.cantidad} onClick={()=>ejecutarReporteGastos(excelGastosAdministrativos)}>Excel</Boton>
+              <Boton icono="download" disabled={!gastosFiltrados.cantidad} onClick={()=>ejecutarReporteGastos(pdfGastosAdministrativos)}>PDF</Boton>
+            </div>
+            <p className="gastos-nota">La base gravada para IVA y el gasto administrativo son conceptos distintos. Esta clasificación no altera el XML, ni el total de impuestos del Panel general, ni acredita automáticamente la deducibilidad del gasto.</p>
+            {gastosFiltrados.pendientesRevision>0&&<p className="qa-fiscal-warning" role="note">{gastosFiltrados.pendientesRevision} documento(s) tienen total XML cero y venta positiva. Abre su detalle e indica un monto de gasto solo si lo has contrastado con el comprobante original.</p>}
+            <div className="table-scroll"><table className="data-table"><thead><tr><th>Fecha</th><th>Emisor / comprobante</th><th className="numero-tabla">Gasto sin IVA</th><th className="numero-tabla">Base IVA</th><th className="numero-tabla">IVA real</th><th>Origen importe</th></tr></thead>
+              <tbody>{gastosFiltrados.filas.map(({documento:f,montoGasto,baseGravadaIVA,iva,manual,requiereRevision})=><tr className="fila-interactiva" key={f.id} onClick={()=>abrirDetalle(f)}>
+                <td>{fechaCorta(f.fecha)}</td><td><strong>{f.emisor?.nombre||f.comercio||'—'}</strong><small className="bloque">{f.consecutivo||f.clave||''}</small></td>
+                <td className="numero-tabla">{crc(montoGasto)}</td><td className="numero-tabla">{crc(baseGravadaIVA)}</td><td className="numero-tabla">{crc(iva)}</td>
+                <td>{manual?'Manual':requiereRevision?'Revisar total cero':'XML'}</td>
+              </tr>)}</tbody></table>
+              {!gastosFiltrados.cantidad&&<p className="gastos-vacio">Marca la casilla «Gasto adm.» en Comprobantes o desde el detalle de una factura.</p>}
+            </div>
+          </section>
+        </>}
+
         {seccion==='reportes'&&<>
           <div className="reports-intro"><div><span className="eyebrow">EXPORTACIONES PROFESIONALES</span><h2>Informes listos para usar</h2><p>Generados con los filtros actuales, separados por empresa y con importes normalizados a CRC.</p></div><span><Icon name="report" size={48}/></span></div>
           <div className="export-grid">
             <div className="surface-card export-card"><div className="export-head"><span className="export-icon azul"><Icon name="file" size={23}/></span><span className="etiqueta etiqueta-azul">PDF</span></div><h3>Resumen general</h3><p>Totales, tipos de comprobante, IVA por tarifa y comercios.</p><Boton icono="download" disabled={!filtrados.length} onClick={()=>ejecutarReporte(pdfResumen)}>Generar PDF</Boton></div>
             <div className="surface-card export-card"><div className="export-head"><span className="export-icon cyan"><Icon name="building" size={23}/></span><span className="etiqueta etiqueta-azul">PDF · CSV</span></div><h3>Totales por comercio</h3><p>Resumen de documentos, base neta e IVA por emisor.</p><div className="export-actions"><Boton clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(csvComercios)}>CSV</Boton><Boton clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(excelComercios)}>Excel</Boton><Boton disabled={!filtrados.length} onClick={()=>ejecutarReporte(pdfComercios)}>PDF</Boton></div></div>
             <div className="surface-card export-card"><div className="export-head"><span className="export-icon violet"><Icon name="tax" size={23}/></span><span className="etiqueta etiqueta-azul">PDF · CSV</span></div><h3>IVA por tarifa</h3><p>Bases imponibles e IVA neto de 0 % a 13 %.</p><div className="export-actions"><Boton clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(csvIVA)}>CSV</Boton><Boton clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(excelIVA)}>Excel</Boton><Boton disabled={!filtrados.length} onClick={()=>ejecutarReporte(pdfIVA)}>PDF</Boton></div></div>
+            <div className="surface-card export-card"><div className="export-head"><span className="export-icon teal"><Icon name="wallet" size={23}/></span><span className="etiqueta etiqueta-verde">PDF · CSV · Excel</span></div>
+              <h3>Gastos administrativos</h3><p>Solo comprobantes marcados. Distingue gasto sin IVA, base IVA e impuesto real.</p>
+              <div className="export-actions"><Boton clase="btn-light" disabled={!gastosFiltrados.cantidad} onClick={()=>ejecutarReporteGastos(csvGastosAdministrativos)}>CSV</Boton><Boton clase="btn-light" disabled={!gastosFiltrados.cantidad} onClick={()=>ejecutarReporteGastos(excelGastosAdministrativos)}>Excel</Boton><Boton disabled={!gastosFiltrados.cantidad} onClick={()=>ejecutarReporteGastos(pdfGastosAdministrativos)}>PDF</Boton></div>
+            </div>
             <div className="surface-card export-card"><div className="export-head"><span className="export-icon amber"><Icon name="receipt" size={23}/></span><span className="etiqueta etiqueta-ambar">CSV</span></div><h3>Comprobantes completos</h3><p>Clave, consecutivo, moneda original, conversión e importes.</p><div className="export-actions"><Boton icono="download" clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(csvDocumentos)}>CSV</Boton><Boton icono="download" disabled={!filtrados.length} onClick={()=>ejecutarReporte(excelDocumentos)}>Excel</Boton></div></div>
             <div className="surface-card export-card"><div className="export-head"><span className="export-icon teal"><Icon name="grid" size={23}/></span><span className="etiqueta etiqueta-ambar">CSV</span></div><h3>Artículos y servicios</h3><p>CAByS, precio unitario, cantidad, IVA y total de cada línea.</p><div className="export-actions"><Boton icono="download" clase="btn-light" disabled={!filtrados.length} onClick={()=>ejecutarReporte(csvLineas)}>CSV</Boton><Boton icono="download" disabled={!filtrados.length} onClick={()=>ejecutarReporte(excelLineas)}>Excel</Boton></div></div>
           </div>
@@ -751,11 +824,32 @@ export default function App() {
       onConfirmar={confirmarImportacionInteligente}/>
 
     {seleccionado&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setSeleccionado(null);}}><aside className="detail-drawer" role="dialog" aria-modal="true" aria-label="Detalle de comprobante"><div className="drawer-header"><div><div className="eyebrow">DOCUMENTO ELECTRÓNICO</div><h2>Detalle del comprobante</h2><p>{seleccionado.tipoDocumento}</p></div><button className="icon-button" onClick={()=>setSeleccionado(null)} title="Cerrar"><Icon name="close" size={20}/></button></div><div className="drawer-body"><div className="detail-total"><span>Total neto · CRC</span><strong className={numero(seleccionado.total)<0?'negativo':''}>{crc(seleccionado.total)}</strong><small>{seleccionado.monedaOriginal==='USD'?`Importe original US$${numero(seleccionado.totalOriginal).toFixed(2)} · cambio aplicado ₡${numero(seleccionado.tipoCambioAplicado).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:5})} (${seleccionado.fechaTipoCambio||'fecha no indicada'})`: 'Documento expresado originalmente en colones'}</small></div>
+      {seleccionado.gastoAdministrativo&&<div className="detail-gasto-admin" role="status">
+        <span>Gasto administrativo registrado · sin IVA</span>
+        <strong>{crc(resumenGastosAdministrativos([seleccionado]).totalGastos)}</strong>
+        <small>{seleccionado.montoGastoManual!=null?'Importe manual para reportes; no modifica el total del XML.':'Importe calculado desde la venta neta del XML.'}</small>
+      </div>}
       <h3 className="drawer-section-title">Información del comprobante</h3><div className="detail-grid">
         {[['Tipo',seleccionado.tipoDocumento],['Fecha',fechaCorta(seleccionado.fecha)],['Versión',seleccionado.versionXML||'—'],['Archivo',seleccionado.nombreArchivo],['Clave',seleccionado.clave],['Consecutivo',seleccionado.consecutivo],['Moneda original',seleccionado.monedaOriginal],['Cambio original XML',seleccionado.tipoCambioOriginalXML ? `${seleccionado.tipoCambioOriginalXML}`:'—'],['Cambio aplicado',seleccionado.tipoCambioAplicado||1],['Fuente del tipo de cambio',seleccionado.fuenteTipoCambio||'Versión anterior: no registrada'],['Fecha de la referencia',seleccionado.fechaTipoCambio||'—'],['Actividad emisor',seleccionado.codigoActividadEmisor||'—']].map(([k,v])=><div key={k}><span>{k}</span><strong>{v||'—'}</strong></div>)}
       </div><h3 className="drawer-section-title">Emisor y receptor</h3><div className="entity-pair"><div><small>EMISOR</small><strong>{seleccionado.emisor?.nombre||'—'}</strong><span>{seleccionado.emisor?.identificacion?.numero||'Sin identificación'}</span></div><div><small>RECEPTOR</small><strong>{seleccionado.receptor?.nombre||'—'}</strong><span>{seleccionado.receptor?.identificacion?.numero||'Sin identificación'}</span></div></div>
       <h3 className="drawer-section-title">Resumen monetario</h3><div className="money-lines">{[['Total de venta',seleccionado.resumen?.totalVenta],['Descuentos',seleccionado.resumen?.totalDescuentos],['Venta neta',seleccionado.resumen?.totalVentaNeta],['Impuestos',seleccionado.resumen?.totalImpuesto],['Total comprobante',seleccionado.total]].map(([k,v])=><div key={k}><span>{k}</span><strong>{crc(v)}</strong></div>)}</div>
       <h3 className="drawer-section-title">Artículos y servicios ({seleccionado.detalle?.length||0})</h3><div className="lineas-detalle">{(seleccionado.detalle||[]).slice(0,limiteLineas).map((l,i)=><div className="linea-card" key={i}><div><span className="linea-id">#{l.linea}</span><strong>{l.detalle||'Sin descripción'}</strong></div><small>CAByS: {l.codigoCABYS||l.codigo||'—'}</small><div className="linea-montos"><span>{l.cantidad} × {crc(l.precioUnitario)}</span><strong>{crc(l.montoTotalLinea)}</strong></div><small>IVA: {(l.impuestos||[]).map(x=>`${x.tarifa}%`).join(', ')||'No indicado'}</small></div>)}{!seleccionado.detalle?.length&&<p className="texto-secundario">Este documento no incluye líneas de detalle.</p>}{(seleccionado.detalle?.length||0)>limiteLineas&&<Boton clase="btn-light" onClick={()=>setLimiteLineas(n=>n+30)}>Mostrar 30 líneas más</Boton>}</div>
+      <h3 className="drawer-section-title">Gasto administrativo</h3>
+      <section className="gasto-drawer-box" aria-label="Clasificación contable del comprobante">
+        <label className="gasto-check-label"><input type="checkbox" checked={seleccionado.gastoAdministrativo===true}
+          disabled={cargando} onChange={e=>guardarGastoAdministrativo(seleccionado,e.target.checked,gastoManualInput)}/>
+          <span><strong>Guardar este comprobante como gasto administrativo</strong><small>Solo para reportes de gastos, sin alterar el XML ni el IVA del Panel general.</small></span>
+        </label>
+        {Math.abs(numero(seleccionado.total))<0.000001 && numero(seleccionado.resumen?.totalVenta)>0&&
+          <div className="qa-fiscal-warning" role="note">Este XML declara total ₡0,00, venta {crc(seleccionado.resumen?.totalVenta)} y descuentos {crc(seleccionado.resumen?.totalDescuentos)}. Verifica el XML original: no se debe asumir que la venta fue efectivamente pagada.</div>}
+        {seleccionado.gastoAdministrativo&&<div className="gasto-monto-manual">
+          <Campo titulo="Monto de gasto sin IVA en colones (opcional; manual)">
+            <input inputMode="decimal" type="text" placeholder={`Ej.: ${numero(seleccionado.resumen?.totalVenta).toFixed(2)}`} value={gastoManualInput} onChange={e=>setGastoManualInput(e.target.value)}/>
+          </Campo>
+          <Boton clase="btn-light" disabled={cargando} onClick={()=>guardarGastoAdministrativo(seleccionado,true,gastoManualInput)}>Guardar monto</Boton>
+          <small>En blanco utiliza la venta neta que declara el XML. Si introduces un monto manual, solo sustituye la base del reporte administrativo; el IVA real permanece sin cambios.</small>
+        </div>}
+      </section>
       <h3 className="drawer-section-title">Organización</h3><div className="mover-documento"><Campo titulo="Mover comprobante a otra empresa"><select value={destinoId} onChange={e=>setDestinoId(e.target.value)}><option value="">Seleccionar empresa destino</option>{perfiles.filter(p=>p.id!==perfilId).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}</select></Campo><Boton icono="transfer" clase="btn-light" disabled={!destinoId||cargando} onClick={moverDocumento}>Mover</Boton></div>
       </div><div className="drawer-footer"><Boton icono="download" onClick={()=>{try{pdfDetalle(perfil,seleccionado);}catch(err){mensaje(err.message,'error');}}}>PDF detalle</Boton><Boton icono="trash" clase="btn-danger-light" disabled={cargando} onClick={()=>borrarDocumento(seleccionado)}>Enviar a Papelera</Boton></div></aside></div>}
 

@@ -295,6 +295,13 @@ function registrarPuente() {
     }
     return peticionAPI(`/api/perfiles/${perfilId}/importar`,'POST',form);
   });
+  ipcMain.handle('comprobanteselectronicoscr:marcar-gasto-administrativo',async(e,perfilId,documentoId,habilitado,montoManual)=>{
+    validarEmisor(e);
+    if (![perfilId,documentoId].every(idValido) || typeof habilitado !== 'boolean')
+      throw new Error('Datos de clasificación inválidos');
+    return peticionJSON(`/api/perfiles/${perfilId}/documentos/${documentoId}/gasto-administrativo`,
+      'PATCH',{habilitado,montoManual});
+  });
   ipcMain.handle('comprobanteselectronicoscr:papelera-listar',async e=>{
     validarEmisor(e);return {documentos:base.listarPapelera()};
   });
