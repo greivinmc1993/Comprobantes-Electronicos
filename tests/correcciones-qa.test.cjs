@@ -64,7 +64,7 @@ test('QA-001: IVA asumido por emisor no se cobra si ImpuestoNeto es cero',()=>{
 });
 test('QA-001: si múltiples impuestos hacen ambiguo el neto, rechaza en vez de inventar montos',()=>{
   const otro={Codigo:'03',Tarifa:'10',Monto:'5'};
-  assert.throws(()=>procesarDocumento(doc({otrosImpuestos:[otro]}),'otros.xml',xml),/ImpuestoNeto ambiguo/);
+  assert.throws(()=>procesarDocumento(doc({otrosImpuestos:[otro]}),'otros.xml',xml),/ImpuestoNeto no conciliado/);
 });
 test('QA-001: una factura USD con exoneración conserva tipo de cambio y convierte IVA neto',()=>{
   const f=procesarDocumento(doc({moneda:'USD',cambio:455.53,exonerado:6.5}), 'usd.xml',xml,

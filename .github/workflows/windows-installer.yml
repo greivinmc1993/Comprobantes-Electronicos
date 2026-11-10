@@ -1,0 +1,111 @@
+name: QA Windows e instalador
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-package:
+    name: Windows Node 22 · QA nativo · NSIS
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+      - name: Configurar Node.js y caché npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Instalar dependencias desde lockfile
+        run: npm ci --no-audit --no-fund
+      - name: Comprobar fixture version anterior
+        run: node -e "require('node:fs').accessSync('tests/fixtures/FacturaCR_v0.6.34_baseline.zip')"
+      - name: Ejecutar regresión de cálculos e integración SQLite
+        run: npm test
+      - name: Probar servidor HTTP con Express y SQLite nativos
+        run: npm run qa:real-server
+      # Fuente congelada de la versión anterior. NO se toma del historial de git
+      # para que el ensayo sea reproducible incluso en clones superficiales.
+      - name: Extraer versión anterior v0.6.34 para prueba de actualización real
+        shell: pwsh
+        run: |
+          $baseline = Join-Path $env:RUNNER_TEMP 'facturacr-previous'
+          Expand-Archive -Path 'tests/fixtures/FacturaCR_v0.6.34_baseline.zip' -DestinationPath $baseline -Force
+          $version = (Get-Content (Join-Path $baseline 'package.json') -Raw | ConvertFrom-Json).version
+          if ($version -ne '0.6.34') { throw "La fuente anterior debe ser 0.6.34, encontrado: $version" }
+      - name: Instalar dependencias de la versión anterior
+        working-directory: ${{ runner.temp }}/facturacr-previous
+        run: npm ci --no-audit --no-fund
+      - name: Compilar interfaz de la versión anterior
+        working-directory: ${{ runner.temp }}/facturacr-previous
+        run: npm run build
+      - name: Generar instalador anterior v0.6.34 para migración
+        working-directory: ${{ runner.temp }}/facturacr-previous
+        run: npx electron-builder --win nsis --publish never
+      - name: Guardar instalador anterior separado del instalador actual
+        shell: pwsh
+        run: |
+          $previous = @(Get-ChildItem (Join-Path $env:RUNNER_TEMP 'facturacr-previous/release') -Filter '*.exe' -File)
+          if ($previous.Count -ne 1) { throw 'Se esperaba un instalador NSIS anterior, encontrado: ' + $previous.Count }
+          Copy-Item $previous[0].FullName (Join-Path $env:RUNNER_TEMP 'FacturaCR-previous-0.6.34.exe') -Force
+      - name: Compilar interfaz React/Vite
+        run: npm run build
+      - name: Crear instalador NSIS Windows sin publicar
+        run: npx electron-builder --win nsis --publish never
+      - name: Arrancar ejecutable empaquetado y verificar interfaz
+        run: npm run qa:packaged
+      # electron-builder recompila better-sqlite3 para la ABI de Electron.
+      # La copia empaquetada ya quedó dentro del .exe; las pruebas siguientes
+      # se ejecutan con Node.js 22 y requieren la ABI nativa de Node.
+      - name: Restaurar better-sqlite3 para Node.js 22 despues de empaquetar Electron
+        shell: pwsh
+        run: |
+          npm rebuild better-sqlite3 --build-from-source --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'No se pudo recompilar better-sqlite3 para Node.js 22' }
+          node tests/qa-node-sqlite-abi.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'better-sqlite3 sigue siendo incompatible con Node.js 22' }
+      - name: Instalar, reinstalar y desinstalar sin perder datos SQLite
+        run: npm run qa:install-upgrade
+      - name: Actualización REAL 0.6.34 a 0.6.59 con datos comerciales persistentes
+        shell: pwsh
+        run: |
+          $current = @(Get-ChildItem 'release' -Filter '*.exe' -File)
+          if ($current.Count -ne 1) { throw 'Se esperaba un instalador actual NSIS' }
+          $env:FACTURACR_QA_PREVIOUS_INSTALLER = Join-Path $env:RUNNER_TEMP 'FacturaCR-previous-0.6.34.exe'
+          $env:FACTURACR_QA_CURRENT_INSTALLER = $current[0].FullName
+          npm run qa:version-upgrade
+      - name: Guardar evidencia del arranque de Electron
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FacturaCR-Electron-Smoke-${{ github.run_number }}
+          path: release/qa-evidence/*
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Verificar instalador y registrar SHA256
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem -Path release -Filter '*.exe' -File -Recurse)
+          if ($files.Count -eq 0) { throw 'No se generó un instalador .exe en release/' }
+          $files | ForEach-Object {
+            Write-Host "Instalador: $($_.FullName) ($($_.Length) bytes)"
+            Get-FileHash $_.FullName -Algorithm SHA256 | Format-List
+          }
+      - name: Guardar instalador como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: FacturaCR-Windows-NSIS-${{ github.run_number }}
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 7

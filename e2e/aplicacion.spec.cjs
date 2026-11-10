@@ -82,3 +82,31 @@ test('Centro contable y auditoría están disponibles en menú',async({page})=>{
  await page.getByRole('button',{name:'Bitácora'}).click();
  await expect(page.getByRole('heading',{name:'Bitácora de operaciones'})).toBeVisible();
 });
+
+test('Importación masiva: asignar dos XML a una empresa con una sola acción',async({page})=>{
+ await page.evaluate(()=>{
+   window.comprobantesDesktop.previsualizar=async()=>({
+     token:'lote-masivo-qa',filas:[
+       {indice:0,archivo:'ficticio-a.xml',estado:'requiere_empresa',empresaSugerida:null,empresasCompatibles:[],sinCedula:[1,2],existentes:[],tipo:'Factura electrónica',total:113,moneda:'CRC'},
+       {indice:1,archivo:'ficticio-b.xml',estado:'requiere_empresa',empresaSugerida:null,empresasCompatibles:[],sinCedula:[1,2],existentes:[],tipo:'Nota de crédito',total:-15,moneda:'CRC'},
+     ]
+   });
+   window.comprobantesDesktop.confirmarImportacion=async(token,selecciones)=>{
+     window.__qaImportacionMasiva={token,selecciones};
+     return {loteId:5,nuevos:2,duplicados:0};
+   };
+ });
+ await page.getByRole('button',{name:'Importación inteligente'}).click();
+ await page.locator('input[type=file]').first().setInputFiles({name:'lote.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')});
+ const modal=page.getByRole('dialog',{name:'Vista previa de importación XML'});
+ await expect(modal).toBeVisible();
+ await expect(modal.getByText('2', {exact:true}).first()).toBeVisible();
+ await modal.getByLabel('Empresa para asignación masiva').selectOption('2');
+ await modal.getByRole('button',{name:/Asignar a 2 XML/}).click();
+ await expect(modal.getByRole('status')).toContainText('2 XML asignados');
+ await modal.getByRole('button',{name:'Confirmar 2 XML'}).click();
+ await expect(modal).toBeHidden();
+ const importacion=await page.evaluate(()=>window.__qaImportacionMasiva);
+ expect(importacion.token).toBe('lote-masivo-qa');
+ expect(importacion.selecciones).toEqual([{indice:0,perfilId:2},{indice:1,perfilId:2}]);
+});

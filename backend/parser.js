@@ -136,9 +136,26 @@ function extraerImpuestos(linea, signo, factor) {
     reconciliacion = 'diferencia inferior a 0.0001 CRC';
   }
   if (Math.abs(diferencia) > microTolerancia && impuestos.length > 1) {
-    throw new Error(`ImpuestoNeto ambiguo en línea ${numeroLinea} con múltiples impuestos: declarado ${objetivo.toFixed(5)}, calculado ${esperado.toFixed(5)}. No se reparte una diferencia entre tarifas.`);
+    // En XML 4.4 un mismo renglón puede contener varios códigos de impuesto.
+    // El nodo ImpuestoNeto es el TOTAL de la línea, no el neto de cada tarifa.
+    // Una diferencia pequeña solo se concilia si el total de línea confirma
+    // independientemente el mismo impuesto neto. NO se asigna a una tarifa.
+    const subtotalD = linea.SubTotal == null ? null : decimalFiscal(linea.SubTotal, 'SubTotal', numeroLinea);
+    const totalD = linea.MontoTotalLinea == null ? null : decimalFiscal(linea.MontoTotalLinea, 'MontoTotalLinea', numeroLinea);
+    const margenLinea = subtotalD && totalD && declaradoD
+      ? Math.max(0.00010001, Math.min(0.00500001, Math.max(subtotalD.semiancho,totalD.semiancho,declaradoD.semiancho) + 0.00000001))
+      : 0;
+    const coincideTotal = subtotalD && totalD && declaradoD &&
+      Math.abs(totalD.valor - subtotalD.valor - objetivo) <= margenLinea;
+    if (Math.abs(diferencia) > 0.01000001 || !coincideTotal) {
+      throw new Error(`ImpuestoNeto no conciliado en línea ${numeroLinea} con múltiples impuestos: ` +
+        `declarado ${objetivo.toFixed(5)}, suma neta ${esperado.toFixed(5)}, ` +
+        `diferencia ${diferencia.toFixed(5)}. Verifica los impuestos y el total de línea.`);
+    }
+    reconciliacion = `ajuste de redondeo ${diferencia.toFixed(5)} CRC conciliado con MontoTotalLinea; ` +
+      'sin asignación automática a una tarifa';
   }
-  if (Math.abs(diferencia) > microTolerancia) {
+  if (Math.abs(diferencia) > microTolerancia && impuestos.length <= 1) {
     // Hay emisores que publican Impuesto.Monto con más decimales, mientras
     // ImpuestoNeto se concilia con MontoTotalLinea - SubTotal. Aceptamos como
     // redondeo como máximo 1 céntimo si existe UNA tarifa y DOS comprobaciones
@@ -173,18 +190,35 @@ function extraerImpuestos(linea, signo, factor) {
   // contable. Se conserva el impuesto bruto original para auditoría. No se
   // distribuye automáticamente un ajuste entre tarifas distintas.
   if (impuestos.length === 1) {
+    // Solo si hay un impuesto se sabe a qué tipo/tarifa corresponde el neto.
     impuestos[0].montoNeto = Math.max(0, objetivo);
-  } else if (asumido > microTolerancia || (declaradoD && Math.abs(diferencia) > microTolerancia)) {
-    throw new Error(`ImpuestoNeto ambiguo en línea ${numeroLinea} con múltiples impuestos; requiere desglose por tarifa.`);
   }
-  return impuestos.map(i => ({
+  const respuesta = impuestos.map(i => ({
     codigo:i.codigo, codigoTarifa:i.codigoTarifa, tarifa:i.tarifa,
     monto:i.montoNeto * signo * factor, impuestoNeto:i.montoNeto * signo * factor,
     montoBruto:i.montoBruto * signo * factor, montoExonerado:i.montoExonerado * signo * factor,
     exoneracion:i.exoneracion, baseSurtido:i.baseSurtido == null ? null : i.baseSurtido * signo * factor,
     esSurtido:i.esSurtido, indiceSurtido:i.indiceSurtido,
-    observacionRedondeo: reconciliacion,
+    observacionRedondeo: impuestos.length === 1 ? reconciliacion : null,
   }));
+  if (impuestos.length > 1) {
+    // Mantener la suma de los impuestos netos igual al ImpuestoNeto DECLARADO,
+    // pero sin inventar una atribución por tarifa: incluye el impuesto asumido
+    // y un posible ajuste de redondeo. No se suma al IVA por tarifa.
+    const ajuste = objetivo - suma;
+    if (Math.abs(ajuste) > 0.00000001) {
+      respuesta.push({
+        codigo:'AJUSTE_NO_ATRIBUIDO',codigoTarifa:null,tarifa:0,
+        monto:ajuste * signo * factor,impuestoNeto:ajuste * signo * factor,
+        montoBruto:0,montoExonerado:0,exoneracion:null,baseSurtido:null,
+        esSurtido:false,indiceSurtido:null,ajusteNoAtribuido:true,
+        observacionRedondeo: reconciliacion ||
+          `impuestos asumidos por el emisor ${asumido.toFixed(5)} CRC; ` +
+          'importe neto conservado sin atribuirlo a una tarifa',
+      });
+    }
+  }
+  return respuesta;
 }
 function extraerDetalleLineas(doc, signo, factor = 1) {
   return asArray(doc.DetalleServicio?.LineaDetalle).map((l, index) => {
@@ -203,6 +237,7 @@ function extraerDetalleLineas(doc, signo, factor = 1) {
       : impuestos.reduce((sum, i) => sum + i.monto, 0),
     montoTotalLinea: numero(l.MontoTotalLinea) * signo * factor,
     detalleSurtido: asArray(l.DetalleSurtido),
+    ajusteNetoSinTarifa: impuestos.filter(i => i.ajusteNoAtribuido).reduce((n,i)=>n+i.monto,0),
     observacionesFiscales: [...new Set(impuestos.map(i => i.observacionRedondeo).filter(Boolean))],
     });
   });
@@ -279,6 +314,7 @@ function procesarDocumento(parsed, nombreArchivo, xml, referencia=null) {
     emisor: persona(doc.Emisor), receptor: persona(doc.Receptor),
     referencias: asArray(doc.InformacionReferencia), otrosCargos: asArray(doc.OtrosCargos),
     impuestos, bases, desgloseTarifas, resumen, detalle,
+    ajusteNetoSinTarifa: detalle.reduce((n,l)=>n+(l.ajusteNetoSinTarifa||0),0),
     observacionesFiscales: detalle.flatMap(l => (l.observacionesFiscales || []).map(mensaje => ({linea:l.linea,mensaje}))),
   };
 }

@@ -24,8 +24,11 @@ export function resumenDatos(documentos=[]) {
   const bases = Object.fromEntries(TASAS.map(t=>[t,0]));
   const tipos={};
   const comercios=new Map();
-  let total=0;
+  let total=0, ajusteNetoSinTarifa=0, documentosConAjuste=0;
   for (const f of documentos) {
+    const ajuste=numero(f.ajusteNetoSinTarifa);
+    ajusteNetoSinTarifa+=ajuste;
+    if(Math.abs(ajuste)>0.00000001) documentosConAjuste++;
     total+=numero(f.total);
     tipos[f.tipoDocumento]=(tipos[f.tipoDocumento]||0)+1;
     const nombre=f.emisor?.nombre || f.comercio || 'Sin nombre';
@@ -42,7 +45,7 @@ export function resumenDatos(documentos=[]) {
   }
   const base=TASAS.reduce((n,t)=>n+bases[t],0);
   const totalIVA=TASAS.reduce((n,t)=>n+iva[t],0);
-  return {total,base,iva,bases,totalIVA,tipos,comercios:[...comercios.values()].sort((a,b)=>b.cantidad-a.cantidad),cantidad:documentos.length};
+  return {total,base,iva,bases,totalIVA,ajusteNetoSinTarifa,documentosConAjuste,tipos,comercios:[...comercios.values()].sort((a,b)=>b.cantidad-a.cantidad),cantidad:documentos.length};
 }
 
 function seguroCSV(valor) {return escaparCSV(valor);}
@@ -57,13 +60,14 @@ function descargarCSV(nombre,encabezados,filas) {
 function sufijo(perfil) {return nombreSeguro(perfil?.nombre);}
 export function csvDocumentos(perfil,docs) {
   descargarCSV(`Comprobantes_${sufijo(perfil)}.csv`,
-    ['Empresa','Tipo','Fecha','Emisor','Cedula emisor','Receptor','Cedula receptor','Consecutivo','Clave','Moneda original','Total original','Cambio aplicado','Fecha TC','Fuente TC','Verificado BCCR','Total CRC','Base IVA CRC','IVA CRC','Archivo'],
+    ['Empresa','Tipo','Fecha','Emisor','Cedula emisor','Receptor','Cedula receptor','Consecutivo','Clave','Moneda original','Total original','Cambio aplicado','Fecha TC','Fuente TC','Verificado BCCR','Total CRC','Base IVA CRC','IVA CRC','Ajuste neto sin tarifa CRC','Observaciones fiscales','Archivo'],
     docs.map(f=>[
       perfil.nombre,f.tipoDocumento,fechaCorta(f.fecha),f.emisor?.nombre||f.comercio,f.emisor?.identificacion?.numero,
       f.receptor?.nombre,f.receptor?.identificacion?.numero,f.consecutivo,f.clave,f.monedaOriginal,
       csvMonto(f.totalOriginal),csvTasa(f.tipoCambioAplicado),f.fechaTipoCambio||'',f.fuenteTipoCambio||'Versión anterior',f.tipoCambioVerificado===true?'Sí':'No',csvMonto(f.total),
       csvMonto(TASAS.reduce((n,t)=>n+numero(f.bases?.[t]),0)),
-      csvMonto((f.impuestos||[]).filter(i=>i.codigo==='01').reduce((n,i)=>n+numero(i.monto),0)),f.nombreArchivo
+      csvMonto((f.impuestos||[]).filter(i=>i.codigo==='01').reduce((n,i)=>n+numero(i.monto),0)),
+      csvMonto(f.ajusteNetoSinTarifa),(f.observacionesFiscales||[]).map(o=>o.mensaje).join(' | '),f.nombreArchivo
     ])
   );
 }
@@ -106,9 +110,10 @@ function descargarExcel(nombre,hojaNombre,encabezados,filas,columnasCRC=[]) {
 }
 export function excelDocumentos(perfil,docs) {
   descargarExcel(`Comprobantes_${sufijo(perfil)}.xlsx`,'Comprobantes',
-    ['Tipo','Fecha','Emisor','Receptor','Consecutivo','Clave','Moneda','Total original','Cambio aplicado','Fecha TC','Fuente TC','Verificado BCCR','Total CRC'],
+    ['Tipo','Fecha','Emisor','Receptor','Consecutivo','Clave','Moneda','Total original','Cambio aplicado','Fecha TC','Fuente TC','Verificado BCCR','Total CRC','Ajuste neto sin tarifa CRC','Observaciones fiscales'],
     docs.map(f=>[f.tipoDocumento,fechaCorta(f.fecha),f.emisor?.nombre||f.comercio,f.receptor?.nombre||'',
-      f.consecutivo,f.clave,f.monedaOriginal,numero(f.totalOriginal),numero(f.tipoCambioAplicado),f.fechaTipoCambio||'',f.fuenteTipoCambio||'Versión anterior',f.tipoCambioVerificado===true?'Sí':'No',numero(f.total)]),[12]);
+      f.consecutivo,f.clave,f.monedaOriginal,numero(f.totalOriginal),numero(f.tipoCambioAplicado),f.fechaTipoCambio||'',f.fuenteTipoCambio||'Versión anterior',f.tipoCambioVerificado===true?'Sí':'No',numero(f.total),numero(f.ajusteNetoSinTarifa),
+      (f.observacionesFiscales||[]).map(o=>o.mensaje).join(' | ')]),[12,13]);
 }
 export function excelIVA(perfil,docs) {
   const r=resumenDatos(docs);
@@ -177,6 +182,9 @@ export function pdfResumen(perfil,docs) {
   pdf.text(`Documentos: ${r.cantidad}   |   Total neto: ${crcPdf(r.total)}`,14,57);
   pdf.setFont('helvetica','normal');pdf.setFontSize(9);
   pdf.text(`Base IVA: ${crcPdf(r.base)}   |   IVA: ${crcPdf(r.totalIVA)}`,14,63);
+  if (r.documentosConAjuste) {
+    pdf.setFontSize(8);pdf.text(`${r.documentosConAjuste} comprobante(s) contienen ajustes netos sin tarifa atribuida. Revisar detalle.`,14,68);
+  }
   let y=tablaPDF(pdf,['Tipo de comprobante','Cantidad'],Object.entries(r.tipos).map(([t,n])=>[t,String(n)]),71);
   y=tablaPDF(pdf,['Tarifa IVA','Base neta CRC','IVA neto CRC'],TASAS.map(t=>[`${t}%`,crcPdf(r.bases[t]),crcPdf(r.iva[t])]),y+9);
   const comercios=r.comercios.map(c=>[c.nombre,String(c.cantidad),crcPdf(c.total),crcPdf(c.iva)]);
@@ -193,8 +201,13 @@ export function pdfComercios(perfil,docs) {
 export function pdfIVA(perfil,docs) {
   const pdf=nuevaHojaPDF(perfil,'Desglose de IVA','Detalle neto por tarifa, notas de crédito incluidas');
   const r=resumenDatos(docs);
-  tablaPDF(pdf,['Tarifa IVA','Base neta CRC','IVA neto CRC'],
+  const y=tablaPDF(pdf,['Tarifa IVA','Base neta CRC','IVA neto CRC'],
     TASAS.map(t=>[`${t}%`,crcPdf(r.bases[t]),crcPdf(r.iva[t])]),56);
+  if(r.documentosConAjuste){
+    pdf.setFontSize(8);pdf.setTextColor(...GRIS);
+    pdf.text(`Atención: ${r.documentosConAjuste} documento(s) con ajuste neto sin atribución de tarifa: ${crcPdf(r.ajusteNetoSinTarifa)}.`,14,y+8);
+    pdf.text('Ese ajuste NO se incorporó a una tarifa de IVA por presunción; consulte XML originales.',14,y+13);
+  }
   cerrarPDF(pdf,`IVA_${sufijo(perfil)}.pdf`);
 }
 export function pdfDetalle(perfil,f) {
@@ -206,6 +219,8 @@ export function pdfDetalle(perfil,f) {
     ['Fecha referencia TC',f.fechaTipoCambio||'-'],['Fuente tipo de cambio',f.fuenteTipoCambio||'Versión anterior (no registrada)'],
     ['Tasa verificada',f.tipoCambioVerificado===true?'Sí':'No'],
     ['Total original',String(f.totalOriginal??'-')],['Total convertido',crcPdf(f.total)],
+    ['Ajuste neto sin tarifa',crcPdf(f.ajusteNetoSinTarifa)],
+    ['Observaciones fiscales',(f.observacionesFiscales||[]).map(o=>`Línea ${o.linea}: ${o.mensaje}`).join(' | ')||'Ninguna'],
   ];
   let y=tablaPDF(pdf,['Campo','Dato'],cabecera,55,{columnStyles:{0:{cellWidth:52},1:{cellWidth:'auto'}}});
   y=tablaPDF(pdf,['#','CABYS / Código','Descripción','Cantidad','Subtotal CRC','IVA CRC','Total CRC'],

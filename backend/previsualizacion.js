@@ -34,7 +34,10 @@ async function previsualizarXML(archivos,perfiles,base,servicioTipoCambio,perfil
         empresasCompatibles:compatibles.map(p=>p.id),sinCedula:sinCedula.map(p=>p.id),
         existentes:enEmpresas,clave:doc.clave,fecha:doc.fecha,tipo:doc.tipoDocumento,total:doc.total,
         moneda:doc.monedaOriginal,emisor:doc.emisor?.nombre,receptor:doc.receptor?.nombre,
-        observaciones:doc.observacionesFiscales?.length||0,advertencia:referencia?.advertencia||null,
+        observaciones:doc.observacionesFiscales?.length||0,
+        advertenciaFiscal:doc.observacionesFiscales?.[0]?.mensaje||null,
+        ajusteNetoSinTarifa:doc.ajusteNetoSinTarifa||0,
+        advertencia:referencia?.advertencia||null,
         empresaActual:perfilPreferido||null});
     }catch(error){filas.push({indice:i,archivo:nombre,estado:'error',error:error.message});}
   }

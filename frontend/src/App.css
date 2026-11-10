@@ -523,3 +523,26 @@ h1,h2,h3,p {margin-top:0}
 @media(max-width:980px){.qa-columns{grid-template-columns:1fr}}
 @media(max-width:620px){.qa-card{padding:15px}.qa-actions{align-items:stretch}.qa-actions .btn{flex:1}.qa-preview{width:100vw;max-height:100dvh;border-radius:0}.qa-metric-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:430px){.qa-metric-grid{grid-template-columns:1fr}}
+
+/* Vista previa v1.4.1: selección rápida de empresa y advertencias de IVA */
+.qa-preview {width:min(1250px,97vw)}
+.qa-preview .modal-body.qa-preview-body {gap:13px;padding:16px 23px 12px}
+.qa-summary {display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.qa-summary>span {padding:7px 12px;border:1px solid #e0e9f7;border-radius:20px;background:#f5f9ff;font-size:11px;color:#456383}
+.qa-summary strong {font-size:13px;color:#1e4794}
+.qa-summary-warning {background:#fff5e8!important;border-color:#ffdfb9!important;color:#955e19!important}
+.qa-bulk-toolbar {display:flex;align-items:end;flex-wrap:wrap;gap:9px;padding:13px 14px;border:1px solid #cfdef5;background:linear-gradient(120deg,#f7fbff,#edf5ff);border-radius:12px}
+.qa-bulk-field {min-width:min(100%,260px);flex:1;display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:750;color:#456383}
+.qa-bulk-field select {width:100%;min-height:39px;border:1px solid #bfcee5;border-radius:9px;background:#fff;padding:6px 11px;color:#203f64;font-size:12px;min-width:0}
+.qa-bulk-toolbar .btn {min-height:39px;white-space:nowrap}
+.qa-bulk-notice {margin:0;font-size:11px;color:#17684f;background:#ebfaf3;border:1px solid #bee7d4;border-radius:8px;padding:9px 12px}
+.qa-precision-note {display:flex;align-items:start;gap:8px;background:#fff9ee;border:1px solid #f4dfb4;border-radius:9px;padding:10px 12px;color:#805c20;font-size:11px;line-height:1.5}
+.qa-inline-error {color:#b42318!important;font-weight:700}
+.qa-fiscal-warning {color:#986418!important;line-height:1.5}
+.qa-incompatible {background:#fff8f7}
+.qa-preview .qa-table td:nth-child(2) {min-width:240px;max-width:330px}
+.qa-preview .qa-table td:nth-child(5) {min-width:175px}
+.qa-preview .qa-table-scroll {max-height:55vh;overflow:auto}
+.qa-preview .qa-table thead th {position:sticky;top:0;z-index:1}
+.qa-preview .qa-table td strong {word-break:break-word;overflow-wrap:anywhere}
+@media(max-width:780px) { .qa-bulk-toolbar .btn {flex:1 1 auto}.qa-bulk-field {flex:1 1 100%}.qa-preview .qa-table-scroll {max-height:48vh} }

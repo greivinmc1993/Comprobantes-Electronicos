@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..');
+const server=fs.readFileSync(path.join(root,'server/index.js'),'utf8');
+const ui=fs.readFileSync(path.join(root,'src/main.jsx'),'utf8');
+assert.match(server,/\/inventory\/alerts/);
+assert.match(server,/WHERE company_id=\? AND is_deleted=0 AND kind='producto'/);
+assert.match(ui,/Lista de reposición/);
+assert.match(ui,/Exportar reposición CSV/);
+assert.match(ui,/inventoryAlerts\.summary\.missingCost/);
+assert.match(server,/type==='ajuste'\?0:1/,'Permitir saldo final cero en ajustes');
+assert.match(server,/loggedQuantity/,'Preservar el esquema histórico con cantidad positiva');
+assert.match(ui,/Vista previa del movimiento/);
+assert.match(ui,/movementSavingRef/);
+assert.match(ui,/Conteo físico/);
+console.log('PASS Contrato UI/API inventario, ajustes a cero, auditoría y bloqueo de envío');

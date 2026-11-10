@@ -23,7 +23,7 @@ test('Electron no muestra la barra File, Edit, View o Window', () => {
   assert.match(main, /ventana\.setMenuBarVisibility\(false\)/);
 });
 test('conserva identidad e instalador independiente', () => {
-  assert.match(pkg.version,/^1\.3\.[0-9]+$/);
+  assert.match(pkg.version,/^1\.[3-9]\.[0-9]+$/);
   assert.equal(pkg.build.appId,'cr.comprobanteselectronicoscr.desktop');
   assert.equal(pkg.build.win.executableName,'ComprobantesElectronicosCR');
 });

@@ -89,5 +89,9 @@ test('Decimal malformado no se acepta',()=>{
 test('No se atribuye un ajuste de varias tarifas a una sola',()=>{
   const l=linea({bruto:'13.00',neto:'18.01',subtotal:'100.00',total:'118.01'});
   l.Impuesto=[l.Impuesto,{Codigo:'03',Monto:'5.00',Tarifa:'5.00'}];
-  assert.throws(()=>procesar(l),/ImpuestoNeto ambiguo|no coincide/);
+  const f=procesar(l);
+  assert.ok(Math.abs(f.detalle[0].impuestoNeto - 18.01) < 0.0000001);
+  assert.ok(Math.abs(f.ajusteNetoSinTarifa - 0.01) < 0.0000001);
+  assert.equal(f.desgloseTarifas['08:13'].impuesto,13);
+  assert.equal(f.detalle[0].impuestos.filter(i=>i.codigo==='AJUSTE_NO_ATRIBUIDO').length,1);
 });
