@@ -80,7 +80,7 @@ test('Centro contable y auditoría están disponibles en menú',async({page})=>{
  await page.getByRole('button',{name:'Compras y ventas'}).click();
  await expect(page.getByRole('heading',{name:'Compras, ventas y conciliación'})).toBeVisible();
  await page.getByRole('button',{name:'Bitácora'}).click();
- await expect(page.getByRole('heading',{name:'Bitácora de operaciones'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Bitácora de operaciones',level:1})).toBeVisible();
 });
 
 test('Importación masiva: asignar dos XML a una empresa con una sola acción',async({page})=>{
@@ -109,4 +109,23 @@ test('Importación masiva: asignar dos XML a una empresa con una sola acción',a
  const importacion=await page.evaluate(()=>window.__qaImportacionMasiva);
  expect(importacion.token).toBe('lote-masivo-qa');
  expect(importacion.selecciones).toEqual([{indice:0,perfilId:2},{indice:1,perfilId:2}]);
+});
+
+test('Vista previa muestra advertencia de base IVA multitarifa no atribuida sin guardar',async({page})=>{
+ await page.evaluate(()=>{
+  window.comprobantesDesktop.previsualizar=async()=>({
+    token:'base-ambigua-sintetica',filas:[{indice:0,archivo:'fiscal-sintetico.xml',
+      estado:'listo',empresaSugerida:1,empresasCompatibles:[1],existentes:[],
+      clave:'QA-SINTETICA',tipo:'Factura electrónica',fecha:'2026-11-02',
+      total:114,moneda:'CRC',baseIVAnoAtribuida:100,
+      advertenciaFiscal:'Base imponible sin desglose por tarifa'}]
+  });
+ });
+ await page.getByRole('button',{name:'Importación inteligente'}).click();
+ await page.locator('input[type=file]').first().setInputFiles({name:'sintetico.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')});
+ const modal=page.getByRole('dialog',{name:'Vista previa de importación XML'});
+ await expect(modal.getByRole('note')).toContainText('NO se duplica entre tarifas');
+ await expect(modal.getByText('fiscal-sintetico.xml')).toBeVisible();
+ await modal.getByRole('button',{name:'Cancelar'}).click();
+ await expect(modal).toBeHidden();
 });

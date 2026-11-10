@@ -83,3 +83,19 @@ Para completar en Windows: instalar dependencias, ejecutar `npm test`, `npm run 
 - **E2E Playwright**: abrir vista previa, confirmar un XML sintético, navegar a compras/ventas y consultar la bitácora.
 
 Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pruebas obligatorias en GitHub Actions se ejecutan después de `npm install` y las pruebas E2E usan Chromium. Un merge no debe considerarse aprobado hasta que terminen los jobs QA y el instalador Windows.
+
+## QA adicional v1.4.2
+
+- `tests/qa-v142-bases-multiples.test.cjs`: IVA 13 % + 1 % en la misma línea, otros tributos, surtidos con bases explícitas, nota de crédito, límites de redondeo, totales del reporte.
+- `tests/qa-v142-xml-real.integration.test.cjs`: XML 4.4 sintéticos procesados con `xml2js` real en Actions, rechazo de archivo fiscal incoherente sin bloquear los demás archivos del lote.
+- `tests/qa-v142-actions.test.cjs`: verifica CI Windows/Linux, JUnit de errores reales, auditoría de seguridad y protección frente a filtración de XML o bases locales.
+- `e2e/aplicacion.spec.cjs`: aviso de base sin tarifa atribuida en la vista previa de React.
+
+**Criterio de aprobación:** GitHub Actions en verde en Windows y Linux, Playwright en Chromium, instalador NSIS descargable y ejecución manual en Windows con copia de base SQLite de prueba. No marcar como aprobado lo no ejecutado.
+
+## Regresiones de GitHub Actions v1.4.3
+
+- API: rechazo de borrado entre empresas (HTTP 400), comprobación de que los registros siguen intactos y borrado autorizado posterior.
+- Node ESM Windows/Linux: `pathToFileURL` para importar módulos `.mjs` en pruebas de asignación masiva.
+- Chromium: selector estricto por nivel de encabezado para la sección de Bitácora.
+- Acciones CI: los trabajos no deben ocultar fallos, se conservan JUnit y capturas.

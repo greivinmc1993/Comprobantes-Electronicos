@@ -1,7 +1,7 @@
 {
   "name": "comprobanteselectronicoscr-desktop",
   "productName": "ComprobantesElectronicosCR",
-  "version": "1.4.1",
+  "version": "1.4.3",
   "description": "Gestor XML de Hacienda 4.4 para Windows: importación revisada, compras y ventas, conciliación, respuestas Hacienda, auditoría, respaldos y carpetas vigiladas",
   "private": true,
   "main": "electron/main.js",
@@ -11,7 +11,7 @@
     "build": "vite build",
     "dist:win": "npm run build && electron-builder --win nsis --x64",
     "pack:win": "npm run build && electron-builder --win dir --x64",
-    "test": "npm run check:syntax && npm run test:unit",
+    "test": "npm run check:syntax && npm run check:repository && npm run test:unit",
     "rebuild:electron": "electron-builder install-app-deps",
     "dev:web": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "test:unit": "node --test tests/*.test.cjs",
@@ -21,7 +21,8 @@
     "test:e2e:ui": "playwright test --ui",
     "check:syntax": "node scripts/check-syntax.cjs",
     "check:package": "node scripts/check-package.cjs",
-    "qa:local": "npm run check:syntax && npm run test:qa && npm run build && npm run check:package",
+    "check:repository": "node scripts/check-repository.cjs",
+    "qa:local": "npm run check:syntax && npm run check:repository && npm run test:qa && npm run build && npm run check:package",
     "qa:diagnosticar-iva": "node scripts/diagnosticar-impuesto-neto.cjs"
   },
   "dependencies": {

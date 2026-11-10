@@ -22,8 +22,8 @@ jobs:
           node-version: '22'
       - name: Instalar dependencias y módulos nativos
         run: npm install --no-audit --no-fund
-      - name: Comprobar la sintaxis
-        run: npm run check:syntax
+      - name: Comprobar privacidad y sintaxis
+        run: npm run check:repository && npm run check:syntax
       - name: Ejecutar todos los tests de Node/SQLite/API
         run: npm run test:ci
       - name: Compilar frontend y validar recursos

@@ -223,6 +223,15 @@ function extraerImpuestos(linea, signo, factor) {
 function extraerDetalleLineas(doc, signo, factor = 1) {
   return asArray(doc.DetalleServicio?.LineaDetalle).map((l, index) => {
     const impuestos = extraerImpuestos(l, signo, factor);
+    // Una línea sin desglose de surtido puede declarar varias tarifas IVA.
+    // No existe información suficiente para asignar TODA BaseImponible a
+    // cada tarifa: hacerlo duplica la base y distorsiona los reportes.
+    const ivaSinSurtido = impuestos.filter(i => i.codigo === '01' && !i.esSurtido);
+    const ivaConBaseAmbigua = new Set(ivaSinSurtido.map(i =>
+      `${i.codigoTarifa || 'sin-codigo'}:${i.tarifa}`)).size > 1;
+    const baseIVAnoAtribuida = ivaConBaseAmbigua
+      ? numero(l.BaseImponible ?? l.MontoBase ?? l.MontoGravable ?? l.SubTotal) * signo * factor
+      : 0;
     return ({
     linea: numero(l.NumeroLinea) || index + 1,
     codigo: texto(l.CodigoCABYS || l.Codigo?.Codigo || l.Codigo),
@@ -238,7 +247,14 @@ function extraerDetalleLineas(doc, signo, factor = 1) {
     montoTotalLinea: numero(l.MontoTotalLinea) * signo * factor,
     detalleSurtido: asArray(l.DetalleSurtido),
     ajusteNetoSinTarifa: impuestos.filter(i => i.ajusteNoAtribuido).reduce((n,i)=>n+i.monto,0),
-    observacionesFiscales: [...new Set(impuestos.map(i => i.observacionRedondeo).filter(Boolean))],
+    baseIVAnoAtribuida,
+    observacionesFiscales: [...new Set([
+      ...impuestos.map(i => i.observacionRedondeo).filter(Boolean),
+      ...(ivaConBaseAmbigua ? [
+        'Base imponible con varias tarifas IVA en una línea sin desglose de base por tarifa; ' +
+        'no se distribuye ni se duplica la base en el informe IVA.'
+      ] : []),
+    ])],
     });
   });
 }
@@ -272,6 +288,7 @@ function procesarDocumento(parsed, nombreArchivo, xml, referencia=null) {
   for (const linea of detalle) {
     const iva = linea.impuestos.filter(i => i.codigo === '01');
     const baseLinea = linea.baseImponible;
+    const baseAmbigua = Math.abs(linea.baseIVAnoAtribuida || 0) > 0.00000001;
     const tasasEnLinea = new Set();
     for (const imp of iva) {
       const tasa = String(imp.tarifa);
@@ -280,7 +297,7 @@ function procesarDocumento(parsed, nombreArchivo, xml, referencia=null) {
       if (!desgloseTarifas[clave]) desgloseTarifas[clave] = {codigoTarifa: imp.codigoTarifa, tarifa: imp.tarifa, base: 0, impuesto: 0};
       desgloseTarifas[clave].impuesto += imp.monto;
       const claveBase = imp.esSurtido ? `${clave}:surtido:${imp.indiceSurtido}` : clave;
-      if (!tasasEnLinea.has(claveBase)) {
+      if (!tasasEnLinea.has(claveBase) && !(baseAmbigua && !imp.esSurtido)) {
         const proporcion = Math.abs(imp.montoBruto) > 0.0000001
           ? Math.max(0, Math.min(1, imp.monto / imp.montoBruto)) : 1;
         desgloseTarifas[clave].base += (imp.baseSurtido == null ? baseLinea : imp.baseSurtido) * proporcion;
@@ -292,7 +309,7 @@ function procesarDocumento(parsed, nombreArchivo, xml, referencia=null) {
     for (const imp of iva) {
       const tasa = String(imp.tarifa);
       const claveTasa = imp.esSurtido ? `${tasa}:surtido:${imp.indiceSurtido}` : tasa;
-      if (tasas.has(claveTasa) || !(tasa in bases)) continue;
+      if (tasas.has(claveTasa) || !(tasa in bases) || (baseAmbigua && !imp.esSurtido)) continue;
       tasas.add(claveTasa);
       // La base del informe IVA representa la parte no exonerada de la línea.
       const proporcion = Math.abs(imp.montoBruto) > 0.0000001
@@ -315,6 +332,7 @@ function procesarDocumento(parsed, nombreArchivo, xml, referencia=null) {
     referencias: asArray(doc.InformacionReferencia), otrosCargos: asArray(doc.OtrosCargos),
     impuestos, bases, desgloseTarifas, resumen, detalle,
     ajusteNetoSinTarifa: detalle.reduce((n,l)=>n+(l.ajusteNetoSinTarifa||0),0),
+    baseIVAnoAtribuida: detalle.reduce((n,l)=>n+(l.baseIVAnoAtribuida||0),0),
     observacionesFiscales: detalle.flatMap(l => (l.observacionesFiscales || []).map(mensaje => ({linea:l.linea,mensaje}))),
   };
 }

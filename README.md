@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.1-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.3-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -35,6 +35,22 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
+
+## Novedades v1.4.3 — Correcciones QA para GitHub Actions
+
+- **Ubuntu:** la prueba de API reconoce correctamente la respuesta de rechazo cuando alguien intenta borrar una nota de crédito desde otra empresa y verifica que ambos historiales permanecen sin cambios.
+- **Windows:** los módulos `.mjs` de asignación masiva se importan mediante `pathToFileURL()` para evitar `ERR_UNSUPPORTED_ESM_URL_SCHEME` con rutas `C:\` o `D:\`.
+- **Playwright:** la Bitácora selecciona el encabezado `h1` por su nivel para evitar la ambigüedad con el `h2` de contenido.
+- Cuatro verificaciones de regresión adicionales permiten detectar que vuelvan esos fallos. Se mantienen los flujos de GitHub Actions y la identidad del instalador.
+
+## Novedades v1.4.2 — QA y bases IVA multitarifa
+
+- Se corrige la **duplicación de la base imponible** cuando una misma línea contiene dos tarifas IVA distintas y no informa la base individual por tarifa. El impuesto declarado se conserva; la base se señala como **«sin tarifa atribuida»** en lugar de inventar una distribución.
+- En un surtido con bases por componente, cada base sí se atribuye a su tarifa correspondiente.
+- En la vista previa se muestra una advertencia de base sin atribuir. Los PDF, CSV y Excel incorporan ese valor de forma separada para su revisión contable.
+- Se ampliaron las pruebas unitarias, de integración con `xml2js` real y las pruebas de interfaz Playwright con comprobantes **sintéticos**.
+- **GitHub Actions** revisa la privacidad del repositorio antes de compilar; la auditoría de seguridad falla si detecta vulnerabilidades altas/críticas en dependencias de producción (antes podía finalizar en verde aunque existieran alertas).
+- Esta mejora no equivale a una validación tributaria de Hacienda. Para errores XML aún no reproducidos se necesitan los archivos originales, que deben permanecer fuera de GitHub.
 
 ## Novedades v1.4.1
 
@@ -137,7 +153,7 @@ npm run dist:win
 El instalador se guardará en:
 
 ```text
-release/ComprobantesElectronicosCR-Setup-1.4.0-x64.exe
+release/ComprobantesElectronicosCR-Setup-1.4.3-x64.exe
 ```
 
 El identificador interno es `cr.comprobanteselectronicoscr.desktop`; **no** es el identificador de FacturaCR. El instalador no está firmado digitalmente. Windows SmartScreen puede advertir sobre un editor desconocido.
@@ -296,3 +312,16 @@ Los ocho XML aportados durante el diagnóstico **no se incluyen en el proyecto n
 En **Comprobantes**, usa las casillas de cada fila para elegir uno o varios XML y selecciona **Mover seleccionados** hacia la empresa correcta, o **Enviar a Papelera** para retirarlos del historial y los reportes sin perder los archivos. Se crea una copia SQLite antes de modificar registros.
 
 En la nueva sección **Papelera**, selecciona documentos y una empresa destino para **Restaurar seleccionados**. La restauración comprueba cédulas y duplicados; si falla un comprobante, no cambia ninguno del lote. El XML original se conserva. Más información en `CHANGELOG.md`.
+
+### Protección del repositorio antes de subir cambios
+
+Ejecuta `npm run check:repository` para verificar que no estés incluyendo XML reales, bases SQLite, credenciales o informes Markdown por versión. Este control se ejecuta también en GitHub Actions. **No elimina archivos**.
+
+Las pruebas con XML real de integración requieren instalar `xml2js` mediante `npm install`. El ZIP fuente no incluye `package-lock.json`, porque no se pudo resolver npm en el entorno de preparación; genera y versiona el lockfile desde Windows antes del primer despliegue reproducible:
+
+```powershell
+npm install
+git add package-lock.json
+```
+
+Después de subir el lockfile y verificar la instalación, se recomienda cambiar los workflows de `npm install` a `npm ci`.

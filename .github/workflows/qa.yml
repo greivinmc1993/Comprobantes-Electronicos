@@ -35,8 +35,8 @@ jobs:
       # ese archivo se recomienda sustituir npm install por npm ci.
       - name: Instalar dependencias nativas y web
         run: npm install --no-audit --no-fund
-      - name: Revisar sintaxis
-        run: npm run check:syntax
+      - name: Comprobar privacidad y sintaxis del proyecto
+        run: npm run check:repository && npm run check:syntax
       - name: Pruebas unitarias e integrales con reporte JUnit
         run: npm run test:ci
       - name: Compilar React con Vite
@@ -63,6 +63,8 @@ jobs:
           node-version: '22'
       - name: Instalar dependencias
         run: npm install --no-audit --no-fund
+      - name: Comprobar privacidad del repositorio
+        run: npm run check:repository
       - name: Instalar Chromium para Playwright
         run: npx playwright install --with-deps chromium
       - name: Probar escritorio y vista móvil

@@ -23,6 +23,7 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
   const pendientes=elegidos.length-validos.length;
   const errores=filas.filter(f=>f.estado==='error').length;
   const conAjuste=elegidos.filter(f=>f.ajusteNetoSinTarifa && Math.abs(f.ajusteNetoSinTarifa)>0.00000001).length;
+  const conBaseAmbigua=elegidos.filter(f=>Math.abs(Number(f.baseIVAnoAtribuida)||0)>0.00000001).length;
   if(!vista)return null;
   const asignarTodos=()=>{
     const perfil=perfiles.find(p=>String(p.id)===empresaMasiva);
@@ -57,6 +58,7 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
       </div>
       {avisoMasivo&&<p className="qa-bulk-notice" role="status">{avisoMasivo}</p>}
       {conAjuste>0&&<div className="qa-precision-note" role="note"><Icon name="alert"/><span>{conAjuste} XML tienen diferencias de impuestos conciliadas sin asignar a una tarifa. El impuesto neto declarado se conserva; revisa la observación fiscal para tus reportes.</span></div>}
+      {conBaseAmbigua>0&&<div className="qa-precision-note" role="note"><Icon name="alert"/><span>{conBaseAmbigua} XML incluyen varias tarifas IVA en una línea sin desglose de base por tarifa. La base se conserva por separado y NO se duplica entre tarifas.</span></div>}
       <div className="qa-table-scroll"><table className="qa-table"><thead><tr>
         <th><input type="checkbox" aria-label="Seleccionar todos los XML válidos" disabled={cargando||!aplicables.length} checked={Boolean(aplicables.length)&&aplicables.every(f=>!excluidos[f.indice])} onChange={e=>marcarTodos(e.target.checked)}/></th>
         <th>XML / tipo</th><th>Importe</th><th>Empresa destino</th><th>Revisión</th></tr></thead>

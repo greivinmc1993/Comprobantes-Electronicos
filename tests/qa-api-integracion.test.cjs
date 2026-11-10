@@ -82,9 +82,18 @@ test('API local: autenticación, perfiles, XML 4.4, deduplicación, aislamiento,
       const estado=(await req(`/api/perfiles/${a.id}/estado`)).data;
       assert.equal(estado.totalNeto,0);
       const idCredito=estado.facturas.find(f=>f.tipoDocumento==='Nota de crédito').id;
-      assert.equal((await req(`/api/perfiles/${b.id}/documentos/${idCredito}`,{method:'DELETE'})).data.eliminado,false);
-      assert.equal((await req(`/api/perfiles/${a.id}/documentos/${idCredito}`,{method:'DELETE'})).data.eliminado,true);
+      // El API protege la pertenencia: un documento de A no se puede borrar desde B.
+      // La ruta inválida responde 400 con {error}, NO {eliminado:false}.
+      const ajeno=await req(`/api/perfiles/${b.id}/documentos/${idCredito}`,{method:'DELETE'});
+      assert.equal(ajeno.status,400);
+      assert.match(ajeno.data.error,/no est[aá] en la empresa/i);
+      assert.equal((await req(`/api/perfiles/${a.id}/estado`)).data.totalNeto,0);
+      assert.equal((await req(`/api/perfiles/${b.id}/estado`)).data.facturas.length,1);
+      const correcto=await req(`/api/perfiles/${a.id}/documentos/${idCredito}`,{method:'DELETE'});
+      assert.equal(correcto.status,200);
+      assert.equal(correcto.data.eliminado,true);
       assert.equal((await req(`/api/perfiles/${a.id}/estado`)).data.totalNeto,113);
+      assert.equal((await req(`/api/perfiles/${b.id}/estado`)).data.facturas.length,1);
     });
   } finally {
     await new Promise(resolve=>servidor.close(resolve));db.cerrar();fs.rmSync(dir,{recursive:true,force:true});

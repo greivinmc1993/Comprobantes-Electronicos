@@ -37,6 +37,7 @@ async function previsualizarXML(archivos,perfiles,base,servicioTipoCambio,perfil
         observaciones:doc.observacionesFiscales?.length||0,
         advertenciaFiscal:doc.observacionesFiscales?.[0]?.mensaje||null,
         ajusteNetoSinTarifa:doc.ajusteNetoSinTarifa||0,
+        baseIVAnoAtribuida:doc.baseIVAnoAtribuida||0,
         advertencia:referencia?.advertencia||null,
         empresaActual:perfilPreferido||null});
     }catch(error){filas.push({indice:i,archivo:nombre,estado:'error',error:error.message});}
