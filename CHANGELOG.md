@@ -1,5 +1,12 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.5 — Navegación accesible y E2E de gastos administrativos
+
+- Nombre accesible estable para «Comprobantes» pese a su contador visual; estado de navegación expuesto con `aria-current`.
+- Pruebas Playwright localizan botones en el menú «Secciones» y verifican los encabezados antes de continuar.
+- Test E2E adicional y tres pruebas de regresión sin dependencias externas.
+- Sin migraciones SQLite ni cambios en identidad NSIS; conserva la clasificación administrativa y los reportes.
+
 ## 1.4.4 — Gastos administrativos
 
 - Marca por documento en SQLite y reporte separado de gasto sin IVA, base gravada para IVA e IVA real, sin alterar el XML.

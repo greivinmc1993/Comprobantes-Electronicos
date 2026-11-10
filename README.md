@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.4-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.5-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -36,6 +36,15 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
+
+## Novedades v1.4.5 — Corrección de Playwright y navegación accesible
+
+- El botón **Comprobantes** tiene un nombre accesible estable, aunque muestre el número de documentos; el contador sigue visible.
+- La navegación activa utiliza `aria-current="page"`, lo que facilita su interpretación por tecnologías de asistencia.
+- Los casos Playwright de gastos administrativos navegan de forma explícita por el menú y comprueban que se abrió la sección correspondiente.
+- Una prueba adicional, en escritorio y vista móvil, protege contra regresiones del contador de documentos.
+- Se mantienen IVA real, monto administrativo manual y validaciones fiscales existentes. Los datos SQLite no requieren migración.
+- Para QA completo ejecuta `npm install`, `npm run test:ci` y `npm run test:e2e`. GitHub Actions ya ejecuta las pruebas E2E y publica capturas y trazas si fallan.
 
 ## Novedades v1.4.4 — Gastos administrativos y facturas de combustible
 
@@ -164,7 +173,7 @@ npm run dist:win
 El instalador se guardará en:
 
 ```text
-release/ComprobantesElectronicosCR-Setup-1.4.4-x64.exe
+release/ComprobantesElectronicosCR-Setup-1.4.5-x64.exe
 ```
 
 El identificador interno es `cr.comprobanteselectronicoscr.desktop`; **no** es el identificador de FacturaCR. El instalador no está firmado digitalmente. Windows SmartScreen puede advertir sobre un editor desconocido.

@@ -572,9 +572,9 @@ export default function App() {
       <div className="selector-empresa"><div className="sidebar-subtitulo">EMPRESA ACTIVA</div><SelectorEmpresa perfiles={perfiles} perfil={perfil} perfilId={perfilId} alCambiar={setPerfilId} deshabilitado={cargando}/><button className="sidebar-link" onClick={()=>abrirPerfil()}><Icon name="plus" size={15}/> Nueva empresa</button></div>
       <div className="sidebar-subtitulo nav-titulo">ESPACIO DE TRABAJO</div>
       <nav className="nav-list" aria-label="Secciones">
-        {NAVEGACION.map(n=><button key={n.id} className={`nav-item ${seccion===n.id?'nav-activo':''}`} onClick={()=>setSeccion(n.id)}><Icon name={n.icono} size={19}/><span>{n.titulo}</span>{n.id==='documentos'&&<span className="nav-count">{todos.length}</span>}</button>)}
+        {NAVEGACION.map(n=><button key={n.id} type="button" aria-label={n.titulo} aria-current={seccion===n.id?'page':undefined} className={`nav-item ${seccion===n.id?'nav-activo':''}`} onClick={()=>setSeccion(n.id)}><Icon name={n.icono} size={19}/><span>{n.titulo}</span>{n.id==='documentos'&&<span className="nav-count" aria-hidden="true">{todos.length}</span>}</button>)}
       </nav>
-      <div className="sidebar-bottom"><div className="sidebar-card"><Icon name="shield" size={21}/><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div><button className="sidebar-backup" onClick={respaldo} disabled={cargando}><Icon name="database" size={18}/> Respaldar base SQLite</button><span className="app-version">ComprobantesElectronicosCR · v1.4.0</span></div>
+      <div className="sidebar-bottom"><div className="sidebar-card"><Icon name="shield" size={21}/><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div><button className="sidebar-backup" onClick={respaldo} disabled={cargando}><Icon name="database" size={18}/> Respaldar base SQLite</button><span className="app-version">ComprobantesElectronicosCR · v1.4.5</span></div>
     </aside>
 
     <div className="workspace">

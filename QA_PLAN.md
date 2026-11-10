@@ -107,3 +107,10 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - `e2e/aplicacion.spec.cjs`: cambio de la casilla y visibilidad de reportes en Chromium; prueba del aviso para documentos con total XML cero.
 - Auditoría y base de datos original no deben modificarse para corregir el importe de una factura. La clasificación administrativa jamás debe excluir IVA real del resumen general.
 - Validación manual requerida: factura de combustible real y su XML para distinguir un total efectivamente cero de un error del emisor. No incluir datos reales en fixtures de GitHub.
+
+## Regresión v1.4.5 — Navegación con contadores y gastos administrativos
+
+- **Accesibilidad:** el botón «Comprobantes» conserva nombre accesible exacto aunque la insignia muestre el número de documentos; se anuncia el estado activo con `aria-current`.
+- **Playwright:** seleccionar la sección mediante la navegación «Secciones», comprobar el `h1` correspondiente y realizar después las acciones de gasto.
+- **Desktop y móvil:** verificar casilla de clasificación administrativa, monto base de ₡100, IVA de ₡13 inalterado y factura con total XML cero con monto manual de ₡30.003.
+- Los casos no utilizan documentos reales. Los resultados completos deben verificarse en GitHub Actions con Chromium y npm instalados.

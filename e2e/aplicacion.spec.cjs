@@ -137,12 +137,25 @@ test('Vista previa muestra advertencia de base IVA multitarifa no atribuida sin 
 });
 
 
+// Regresión: el contador visible de comprobantes no modifica el nombre accesible del botón.
+test('Navegación: Comprobantes tiene nombre estable aunque muestre contador',async({page})=>{
+ const navegacion=page.getByRole('navigation',{name:'Secciones'});
+ const enlace=navegacion.getByRole('button',{name:'Comprobantes',exact:true});
+ await expect(enlace).toBeVisible();
+ await expect(enlace.locator('.nav-count')).toHaveText('1');
+ await enlace.click();
+ await expect(page.getByRole('heading',{name:'Comprobantes',level:1})).toBeVisible();
+ await expect(enlace).toHaveAttribute('aria-current','page');
+});
+
 test('Gasto administrativo: checkbox, reporte y permanencia del IVA en el panel',async({page})=>{
- await page.getByRole('button',{name:'Comprobantes',exact:true}).click();
+ await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Comprobantes',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Comprobantes',level:1})).toBeVisible();
  const checkbox=page.getByRole('checkbox',{name:/Marcar como gasto administrativo/});
  await checkbox.check();
  await expect(checkbox).toBeChecked();
- await page.getByRole('button',{name:'Gastos administrativos',exact:true}).click();
+ await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Gastos administrativos',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Gastos administrativos',level:1})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Reporte de gastos administrativos'})).toBeVisible();
  await expect(page.locator('.gastos-resumen')).toContainText('₡100,00');
  await expect(page.locator('.gastos-resumen')).toContainText('₡13,00');
@@ -168,7 +181,8 @@ test('Total XML cero: importe manual solo afecta al reporte de gastos',async({pa
  await page.getByRole('menuitemradio',{name:/Empresa Ficticia Sur/}).click();
  await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Sur/}).click();
  await page.getByRole('menuitemradio',{name:/Empresa Ficticia Norte/}).click();
- await page.getByRole('button',{name:'Comprobantes',exact:true}).click();
+ await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Comprobantes',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Comprobantes',level:1})).toBeVisible();
  await page.locator('tr.fila-interactiva').first().click();
  const dlg=page.getByRole('dialog',{name:'Detalle de comprobante'});
  await expect(dlg.getByRole('note')).toContainText('Este XML declara total ₡0,00');
@@ -176,6 +190,7 @@ test('Total XML cero: importe manual solo afecta al reporte de gastos',async({pa
  await dlg.getByPlaceholder(/Ej\.: 30003/).fill('30003');
  await dlg.getByRole('button',{name:'Guardar monto'}).click();
  await dlg.getByTitle('Cerrar').click();
- await page.getByRole('button',{name:'Gastos administrativos',exact:true}).click();
+ await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Gastos administrativos',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Gastos administrativos',level:1})).toBeVisible();
  await expect(page.locator('.gastos-resumen')).toContainText(/30[.,\s]003[.,\s]00/);
 });
