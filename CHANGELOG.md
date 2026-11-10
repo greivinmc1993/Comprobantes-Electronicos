@@ -1,5 +1,13 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.7 — Pruebas E2E de gastos y cupones reproducibles
+
+- Preparar los escenarios de XML total cero y cupón en la inicialización de Playwright, antes del montaje de React.
+- Evitar carreras del test que alternaba perfiles para actualizar la API simulada.
+- Verificar confirmación explícita y efectos sobre gasto, total fiscal e IVA con datos sintéticos.
+- Conservar componentes, SQLite, Electron y NSIS sin cambios funcionales.
+
+
 ## 1.4.6 — Comprobantes con cupón y total fiscal cero
 
 - Mostrar pago con cupón y mercancías no sujetas cuando el XML declara descuento total.

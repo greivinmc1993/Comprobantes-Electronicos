@@ -123,3 +123,12 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - Registrar gasto manual requiere consentimiento en la interfaz; IVA se conserva.
 - Nota de crédito no dispara sugerencia.
 - CSV y Excel distinguen monto de gasto y referencia de cupón sin sumarla a totales.
+
+
+## Regresión v1.4.7 — cupón, total cero y Playwright
+
+- E2E: los escenarios de cupones y de venta con descuento completo se inyectan antes de cargar React (`?qa-fixture=cupon-cero` y `?qa-fixture=xml-cero`).
+- E2E: comprueba la presencia de la referencia, la marca voluntaria, la confirmación de `window.confirm`, el importe manual guardado y que el total fiscal y el IVA siguen en cero.
+- Unitarias: `tests/qa-v147-flujo-cupon.test.cjs` comprueba que el cupón no se contabiliza sin intervención, el flujo de marcado y la separación de importes.
+- Ejecución requerida: `npm run test:e2e` en GitHub Actions para Chromium de escritorio y móvil; conservar trazas si falla.
+- **No se da por aprobado Playwright hasta ver el resultado del workflow.**

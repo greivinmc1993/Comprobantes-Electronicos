@@ -13,11 +13,27 @@ test.beforeEach(async({page})=>{
    total:113,monedaOriginal:'CRC',tipoCambioAplicado:1,totalOriginal:113,comercio:'Comercio ficticio',
    emisor:{nombre:'Comercio ficticio',identificacion:{numero:'3101111111'}},receptor:{nombre:'Cliente ficticio'},
    bases:{'13':100},impuestos:[{codigo:'01',tarifa:13,monto:13}],resumen:{totalVenta:100,totalVentaNeta:100,totalGravado:100,totalImpuesto:13},detalle:[],gastoAdministrativo:false,montoGastoManual:null};
-  const estado=id=>({perfil:perfiles.find(p=>p.id===id),facturas:id===1?[factura]:[],iva:{'13':id===1?13:0},base:{'13':id===1?100:0},totalNeto:id===1?113:0,documentos:{},errores:[]});
+  // Los escenarios se preparan ANTES de montar React y de consultar la API.
+  // Cambiar el mock tras montar la interfaz producía pruebas sensibles a carreras.
+  const escenario=new URLSearchParams(window.location.search).get('qa-fixture');
+  if(escenario==='xml-cero') Object.assign(factura,{
+    total:0,totalOriginal:0,impuestos:[],
+    resumen:{...factura.resumen,totalVenta:30003,totalDescuentos:30003,
+      totalVentaNeta:0,totalGravado:0,totalImpuesto:0,totalNoSujeto:30003}
+  });
+  if(escenario==='cupon-cero') Object.assign(factura,{
+    total:0,totalOriginal:0,impuestos:[],
+    resumen:{...factura.resumen,totalVenta:10025,totalNoSujeto:10025,
+      totalDescuentos:10025,totalVentaNeta:0,totalGravado:0,totalImpuesto:0,
+      medioPago:[{tipo:'99',medio:'Cupón',total:10025}]}
+  });
+  window.__qaGastosGuardados=[];
+  const estado=id=>({perfil:perfiles.find(p=>p.id===id),facturas:id===1?[factura]:[],iva:{'13':id===1?factura.resumen.totalImpuesto:0},base:{'13':id===1?factura.resumen.totalGravado:0},totalNeto:id===1?factura.total:0,documentos:{},errores:[]});
   window.comprobantesDesktop={
    listarPerfiles:async()=>({perfiles:[...perfiles]}),listar:async(id)=>estado(id),
    marcarGastoAdministrativo:async(perfilId,docId,habilitado,montoManual)=>{
      if(perfilId!==1 || docId!==1) throw new Error('No pertenece a la empresa');
+     window.__qaGastosGuardados.push({perfilId,docId,habilitado,montoManual});
      factura.gastoAdministrativo=habilitado;
      factura.montoGastoManual=habilitado?(montoManual??null):null;
      return {resultado:{documentoId:docId,gastoAdministrativo:habilitado,montoGastoManual:factura.montoGastoManual}};
@@ -163,69 +179,60 @@ test('Gasto administrativo: checkbox, reporte y permanencia del IVA en el panel'
  await expect(page.locator('.iva-panel')).toContainText('₡13,00');
 });
 
-test('Total XML cero: importe manual solo afecta al reporte de gastos',async({page})=>{
- await page.evaluate(()=>{
-   // El estado se almacena en el objeto de la prueba, no se envían datos fiscales reales.
-   // El puente simulado se modifica para presentar un XML de total cero.
-   const anterior=window.comprobantesDesktop.listar;
-   window.comprobantesDesktop.listar=async id=>{
-     const estado=await anterior(id);
-     if(id===1)estado.facturas=estado.facturas.map(f=>({...f,total:0,totalOriginal:0,
-       resumen:{totalVenta:30003,totalDescuentos:30003,totalVentaNeta:0,totalGravado:0,totalImpuesto:0},
-       impuestos:[],gastoAdministrativo:f.gastoAdministrativo,montoGastoManual:f.montoGastoManual}));
-     return estado;
-   };
- });
- // Forzar que React vuelva a consultar la API simulada.
- await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Norte/}).click();
- await page.getByRole('menuitemradio',{name:/Empresa Ficticia Sur/}).click();
- await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Sur/}).click();
- await page.getByRole('menuitemradio',{name:/Empresa Ficticia Norte/}).click();
- await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Comprobantes',exact:true}).click();
+// Cargar un escenario nuevo hace que la API simulada y el estado de React
+// coincidan desde el primer render. No alternar perfiles para forzar recargas.
+async function abrirDetalleFixture(page,escenario) {
+ await page.goto(`/?qa-fixture=${escenario}`);
+ await expect(page.getByRole('heading',{name:'Panel general',level:1})).toBeVisible();
+ const menu=page.getByRole('navigation',{name:'Secciones'});
+ await menu.getByRole('button',{name:'Comprobantes',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Comprobantes',level:1})).toBeVisible();
- await page.locator('tr.fila-interactiva').first().click();
- const dlg=page.getByRole('dialog',{name:'Detalle de comprobante'});
+ const fila=page.locator('tr.fila-interactiva').first();
+ await expect(fila).toBeVisible();
+ await fila.click();
+ const detalle=page.getByRole('dialog',{name:'Detalle de comprobante'});
+ await expect(detalle).toBeVisible();
+ return detalle;
+}
+
+test('Total XML cero: importe manual solo afecta al reporte de gastos',async({page})=>{
+ const dlg=await abrirDetalleFixture(page,'xml-cero');
  await expect(dlg.getByRole('note')).toContainText('Este XML declara total ₡0,00');
  await dlg.getByRole('checkbox',{name:/Guardar este comprobante como gasto administrativo/}).check();
+ await expect(dlg.getByRole('checkbox',{name:/Guardar este comprobante como gasto administrativo/})).toBeChecked();
  await dlg.getByPlaceholder(/Ej\.: 30003/).fill('30003');
  await dlg.getByRole('button',{name:'Guardar monto'}).click();
+ await expect(dlg.locator('.detail-gasto-admin')).toContainText(/₡30[.,\s]003,00/);
+ const ultima=await page.evaluate(()=>window.__qaGastosGuardados.at(-1));
+ expect(ultima).toMatchObject({perfilId:1,docId:1,habilitado:true,montoManual:30003});
+ await expect(dlg.locator('.detail-total')).toContainText('₡0,00');
  await dlg.getByTitle('Cerrar').click();
  await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Gastos administrativos',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Gastos administrativos',level:1})).toBeVisible();
- await expect(page.locator('.gastos-resumen')).toContainText(/30[.,\s]003[.,\s]00/);
+ await expect(page.locator('.gastos-resumen')).toContainText(/₡30[.,\s]003,00/);
 });
 
 test('Cupón sin IVA y total fiscal cero: referencia se registra solo con confirmación',async({page})=>{
- await page.evaluate(()=>{
-   const listarAnterior=window.comprobantesDesktop.listar;
-   window.comprobantesDesktop.listar=async id=>{
-     const estado=await listarAnterior(id);
-     if(id===1) estado.facturas=estado.facturas.map(f=>({...f,total:0,totalOriginal:0,
-       resumen:{...f.resumen,totalVenta:10025,totalNoSujeto:10025,totalDescuentos:10025,
-         totalVentaNeta:0,totalGravado:0,totalImpuesto:0,
-         medioPago:[{tipo:'99',medio:null,total:10025}]},
-       impuestos:[],gastoAdministrativo:f.gastoAdministrativo,montoGastoManual:f.montoGastoManual}));
-     return estado;
-   };
- });
- // Volver a consultar los documentos sintéticos de la empresa de QA.
- await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Norte/}).click();
- await page.getByRole('menuitemradio',{name:/Empresa Ficticia Sur/}).click();
- await page.getByRole('button',{name:/Empresa activa: Empresa Ficticia Sur/}).click();
- await page.getByRole('menuitemradio',{name:/Empresa Ficticia Norte/}).click();
- await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Comprobantes',exact:true}).click();
- await page.locator('tr.fila-interactiva').first().click();
- const dlg=page.getByRole('dialog',{name:'Detalle de comprobante'});
+ const dlg=await abrirDetalleFixture(page,'cupon-cero');
  await expect(dlg.locator('.detail-total')).toContainText('₡0,00');
- await expect(dlg.locator('.cupon-referencia')).toContainText('₡10.025,00');
+ await expect(dlg.locator('.cupon-referencia')).toContainText(/₡10[.,\s]025,00/);
+ expect(await page.evaluate(()=>window.__qaGastosGuardados.length)).toBe(0);
  await dlg.getByRole('checkbox',{name:/Guardar este comprobante como gasto administrativo/}).check();
+ await expect(dlg.getByRole('checkbox',{name:/Guardar este comprobante como gasto administrativo/})).toBeChecked();
  await expect(dlg.locator('.detail-gasto-admin')).toContainText('₡0,00');
- page.once('dialog',confirmacion=>confirmacion.accept());
- await dlg.getByRole('button',{name:'Registrar referencia como gasto manual'}).click();
- await expect(dlg.locator('.detail-gasto-admin')).toContainText('₡10.025,00');
+ const guardarReferencia=dlg.getByRole('button',{name:'Registrar referencia como gasto manual'});
+ await expect(guardarReferencia).toBeVisible();
+ let mensajeConfirmacion='';
+ page.once('dialog',async d=>{mensajeConfirmacion=d.message();await d.accept();});
+ await guardarReferencia.click();
+ await expect.poll(async()=>page.evaluate(()=>window.__qaGastosGuardados.at(-1)?.montoManual)).toBe(10025);
+ expect(mensajeConfirmacion).toMatch(/total ₡0,00/);
+ await expect(dlg.locator('.detail-gasto-admin')).toContainText(/₡10[.,\s]025,00/);
  await expect(dlg.locator('.detail-total')).toContainText('₡0,00');
  await dlg.getByTitle('Cerrar').click();
  await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Gastos administrativos',exact:true}).click();
- await expect(page.locator('.gastos-resumen')).toContainText('₡10.025,00');
+ await expect(page.locator('.gastos-resumen')).toContainText(/₡10[.,\s]025,00/);
  await expect(page.locator('.gastos-resumen')).toContainText('₡0,00');
+ await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Panel general',exact:true}).click();
+ await expect(page.locator('.iva-panel')).toContainText('₡0,00');
 });

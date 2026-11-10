@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.6-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.7-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -37,7 +37,13 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
 
-## Novedades v1.4.6 — Corrección de Playwright y navegación accesible
+## Novedades v1.4.7 — Pruebas estables de cupón y gastos administrativos
+
+- Las pruebas Playwright crean los XML sintéticos antes del primer render de React, eliminando la necesidad de cambiar varias veces de empresa para actualizar un mock.
+- Se prueban por separado la marca de gasto, la confirmación, el importe de referencia, el total fiscal y el IVA.
+- La versión anterior conserva sus funciones. El resultado de Playwright en GitHub Actions debe verificarse tras subir el commit.
+
+## Novedades v1.4.6 — Cupón y combustible con total fiscal cero
 
 - El botón **Comprobantes** tiene un nombre accesible estable, aunque muestre el número de documentos; el contador sigue visible.
 - La navegación activa utiliza `aria-current="page"`, lo que facilita su interpretación por tecnologías de asistencia.
@@ -173,7 +179,7 @@ npm run dist:win
 El instalador se guardará en:
 
 ```text
-release/ComprobantesElectronicosCR-Setup-1.4.6-x64.exe
+release/ComprobantesElectronicosCR-Setup-1.4.7-x64.exe
 ```
 
 El identificador interno es `cr.comprobanteselectronicoscr.desktop`; **no** es el identificador de FacturaCR. El instalador no está firmado digitalmente. Windows SmartScreen puede advertir sobre un editor desconocido.
