@@ -1,5 +1,12 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.13 — Una revisión para todos los XML, manteniendo la validación anterior
+
+- Base funcional: v1.4.11. **Se revierten los cambios de la v1.4.12 relacionados con la omisión parcial automática y los nuevos estados de duplicados.**
+- Única mejora funcional: más de diez comprobantes pueden revisarse y guardarse en un solo lote (máximo 2.000, 256 MB), con renderizado progresivo de filas.
+- Se conserva la identificación de duplicados, la validación de empresa y las reglas de confirmación originales.
+- Pruebas QA y GitHub Actions conservados; pruebas nuevas para límites y regresión del comportamiento de revisión.
+
 ## 1.4.11 — Accesibilidad de confirmaciones y QA E2E
 
 - Diferenciados los nombres accesibles de los botones «Cancelar» y «Cerrar diálogo de confirmación» para evitar coincidencias ambiguas en Playwright.

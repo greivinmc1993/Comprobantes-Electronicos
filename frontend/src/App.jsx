@@ -216,7 +216,6 @@ export default function App() {
   const [destinoId,setDestinoId]=useState('');
   const [erroresImportacion,setErroresImportacion]=useState([]);
   const [vistaImportacion,setVistaImportacion]=useState(null);
-  const [colaPendiente,setColaPendiente]=useState([]);
   const [respaldoParaRestaurar,setRespaldoParaRestaurar]=useState(null);
   const [confirmarRestauracion,setConfirmarRestauracion]=useState('');
   const [textoBuscar,setTextoBuscar]=useState('');
@@ -330,9 +329,14 @@ export default function App() {
 
   const prepararVista=async(files)=>{
     if(!files.length)return;
+    const MAX_ARCHIVOS=2000, MAX_BYTES=256*1024*1024;
+    if(files.length>MAX_ARCHIVOS)return mensaje(`Máximo ${MAX_ARCHIVOS} XML en una revisión.`, 'warn');
+    if(files.reduce((n,f)=>n+(Number(f.size)||0),0)>MAX_BYTES)return mensaje('La selección supera 256 MB. Reduce su tamaño.', 'warn');
     setCargando(true);
     try{
-      const lote=await Promise.all(files.slice(0,10).map(async f=>({nombre:f.name,bytes:new Uint8Array(await f.arrayBuffer())})));
+      // Se leen todos los comprobantes sin dividirlos en tandas de diez.
+      const lote=[];
+      for(const f of files)lote.push({nombre:f.name,bytes:new Uint8Array(await f.arrayBuffer())});
       const resultado=await desktop.previsualizar(perfilId,lote);
       setVistaImportacion(resultado);
       setSeccion('importacion');
@@ -343,9 +347,7 @@ export default function App() {
     const files=[...(e.target.files||[])];e.target.value='';
     if(!files.length)return;
     if(!perfiles.length)return mensaje('Primero registra una empresa.','warn');
-    setColaPendiente(files.slice(10));
-    if(files.length>10)mensaje(`Se revisarán los primeros 10 XML. Quedan ${files.length-10} para el siguiente lote.`, 'warn');
-    await prepararVista(files.slice(0,10));
+    await prepararVista(files);
   };
   const confirmarImportacionInteligente=async selecciones=>{
     if(!vistaImportacion||!desktop)return;
@@ -355,12 +357,6 @@ export default function App() {
       setVistaImportacion(null);
       await recargar();await recuperarPerfiles();
       mensaje(`Lote #${r.loteId}: ${r.nuevos} nuevo(s), ${r.duplicados} duplicado(s). Puedes deshacerlo en Importación inteligente.`);
-      if(colaPendiente.length){
-        const siguiente=colaPendiente.slice(0,10);
-        setColaPendiente(v=>v.slice(10));
-        // La siguiente vista previa exige su propia confirmación.
-        await prepararVista(siguiente);
-      }
     }catch(error){mensaje(`No se guardó el lote: ${error.message}`,'error');setVistaImportacion(null);}
     finally{setCargando(false);}
   };
@@ -892,7 +888,7 @@ export default function App() {
     </div>
 
     <VistaPrevia vista={vistaImportacion} perfiles={perfiles} cargando={cargando}
-      onCerrar={()=>{setVistaImportacion(null);setColaPendiente([]);}}
+      onCerrar={()=>setVistaImportacion(null)}
       onConfirmar={confirmarImportacionInteligente}/>
 
     {seleccionado&&<div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setSeleccionado(null);}}><aside className="detail-drawer" role="dialog" aria-modal="true" aria-label="Detalle de comprobante"><div className="drawer-header"><div><div className="eyebrow">DOCUMENTO ELECTRÓNICO</div><h2>Detalle del comprobante</h2><p>{seleccionado.tipoDocumento}</p></div><button className="icon-button" onClick={()=>setSeleccionado(null)} title="Cerrar"><Icon name="close" size={20}/></button></div><div className="drawer-body"><div className="detail-total"><span>Total neto · CRC</span><strong className={numero(seleccionado.total)<0?'negativo':''}>{crc(seleccionado.total)}</strong><small>{seleccionado.monedaOriginal==='USD'?`Importe original US$${numero(seleccionado.totalOriginal).toFixed(2)} · cambio aplicado ₡${numero(seleccionado.tipoCambioAplicado).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:5})} (${seleccionado.fechaTipoCambio||'fecha no indicada'})`: 'Documento expresado originalmente en colones'}</small></div>

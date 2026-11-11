@@ -29,7 +29,7 @@ test('API: autenticación, límites de archivos y CSP',()=>{
   assert.match(s,/Bearer \$\{token\}/);
   assert.match(s,/api\.use\('\/api',auth\)/);
   assert.match(s,/15\*1024\*1024/);
-  assert.match(s,/files:10/);
+  assert.match(s,/files:MAX_ARCHIVOS_XML/);
   assert.match(s,/frame-ancestors 'none'/);
 });
 test('No empaquetar datos locales o secretos',()=>{

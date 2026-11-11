@@ -2,6 +2,7 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
+const {MAX_ARCHIVOS_XML} = require('./limites-importacion');
 
 function crearVigilancia(configDir){
   const archivo=path.join(configDir,'vigilancia-xml.json');
@@ -13,7 +14,7 @@ function crearVigilancia(configDir){
   function revisar(){
     if(!config.habilitado||!config.carpeta)return estado();
     let archivos=[];
-    try {archivos=fs.readdirSync(config.carpeta,{withFileTypes:true}).filter(f=>f.isFile()&&/\.xml$/i.test(f.name)).slice(0,1000);}
+    try {archivos=fs.readdirSync(config.carpeta,{withFileTypes:true}).filter(f=>f.isFile()&&/\.xml$/i.test(f.name)).slice(0,MAX_ARCHIVOS_XML);}
     catch(error){return {...estado(),error:`No se puede abrir la carpeta: ${error.message}`};}
     for(const entrada of archivos){
       const ruta=path.join(config.carpeta,entrada.name);
@@ -21,7 +22,7 @@ function crearVigilancia(configDir){
       if(s.size<1||s.size>15*1024*1024||Date.now()-s.mtimeMs<2000)continue;
       const id=crypto.createHash('sha256').update(`${ruta}|${s.size}|${s.mtimeMs}`).digest('hex');
       if(config.vistos.includes(id)||pendientes.has(id))continue;
-      if(pendientes.size>=100)break;
+      if(pendientes.size>=MAX_ARCHIVOS_XML)break;
       pendientes.set(id,{id,nombre:entrada.name,ruta,bytes:s.size,modificado:s.mtimeMs});
     }
     return estado();
@@ -36,7 +37,7 @@ function crearVigilancia(configDir){
     guardar();return revisar();
   }
   function obtenerArchivos(ids){
-    if(!Array.isArray(ids)||ids.length<1||ids.length>10)throw new Error('Selecciona entre 1 y 10 archivos');
+    if(!Array.isArray(ids)||ids.length<1||ids.length>MAX_ARCHIVOS_XML)throw new Error(`Selecciona entre 1 y ${MAX_ARCHIVOS_XML} archivos`);
     return ids.map(id=>{
       const f=pendientes.get(id);if(!f)throw new Error('El archivo seleccionado ya no está pendiente');
       const s=fs.statSync(f.ruta);

@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const {normalizarIdentificacion} = require('./identificaciones');
+const {MAX_ARCHIVOS_XML} = require('./limites-importacion');
 const {identidadComercio,agruparGastosComercios} = require('./comercios-gastos');
 
 const LEGACY_PROFILE_NAME = 'Sin asignar (historial anterior)';
@@ -355,7 +356,7 @@ function abrirBaseDatos(ruta) {
       })();
     },
     importarLote(items){
-      if(!Array.isArray(items)||items.length<1||items.length>10)throw new Error('El lote debe contener de 1 a 10 XML');
+      if(!Array.isArray(items)||items.length<1||items.length>MAX_ARCHIVOS_XML)throw new Error(`El lote debe contener de 1 a ${MAX_ARCHIVOS_XML} XML`);
       return db.transaction(()=>{
         const id=nuevoLote.run().lastInsertRowid;
         let nuevos=0,duplicados=0;

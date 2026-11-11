@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const multer = require('multer');
+const {MAX_ARCHIVOS_XML} = require('./limites-importacion');
 const path = require('node:path');
 const {TASAS, TIPOS_DOCUMENTO, crearTotales, parsearXML, procesarDocumento, identificarDocumento, datosMonedaDocumento} = require('./parser');
 
@@ -21,7 +22,7 @@ function crearAPI(base, token, rutaFrontend, servicioTipoCambio) {
   };
   api.use('/api',auth);
   api.use('/api',express.json({limit:'32kb'}));
-  const upload = multer({storage:multer.memoryStorage(),limits:{fileSize:15*1024*1024,files:10}});
+  const upload = multer({storage:multer.memoryStorage(),limits:{fileSize:15*1024*1024,files:MAX_ARCHIVOS_XML}});
   const valid = fn => (req,res)=>{
     try {res.json(fn(req,res));}
     catch(e) {res.status(400).json({error:e.message || 'Solicitud inválida'});}
@@ -57,7 +58,7 @@ function crearAPI(base, token, rutaFrontend, servicioTipoCambio) {
   // Las empresas solo se eliminan mediante Electron, tras respaldo y confirmación reforzada.
   api.get('/api/perfiles/:id/estado',valid(req=>resumenHistorico(Number(req.params.id))));
 
-  api.post('/api/perfiles/:id/importar',upload.array('files',10),async(req,res)=>{
+  api.post('/api/perfiles/:id/importar',upload.array('files',MAX_ARCHIVOS_XML),async(req,res)=>{
     let perfil;
     try {perfil = base.perfil(Number(req.params.id));}
     catch(e) {return res.status(400).json({error:e.message});}
@@ -109,7 +110,7 @@ function crearAPI(base, token, rutaFrontend, servicioTipoCambio) {
     if (!primero) return {perfil:null,iva:crearTotales(),base:crearTotales(),totalNeto:0,documentos:{},facturas:[],errores:[]};
     return resumenHistorico(primero.id);
   }));
-  api.post('/api/importar',upload.array('files',10),(req,res)=>res.status(410).json({error:'Selecciona un perfil antes de importar'}));
+  api.post('/api/importar',upload.array('files',MAX_ARCHIVOS_XML),(req,res)=>res.status(410).json({error:'Selecciona un perfil antes de importar'}));
 
   api.use('/api',(req,res)=>res.status(404).json({error:'Ruta API desconocida'}));
   if (rutaFrontend) api.get('*',(req,res)=>res.sendFile(path.join(rutaFrontend,'index.html')));

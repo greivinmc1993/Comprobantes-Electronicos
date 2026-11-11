@@ -1,9 +1,10 @@
 'use strict';
 const {parsearXML,identificarDocumento,datosMonedaDocumento,procesarDocumento}=require('./parser');
 const {normalizarIdentificacion}=require('./identificaciones');
+const {MAX_ARCHIVOS_XML} = require('./limites-importacion');
 
 async function previsualizarXML(archivos,perfiles,base,servicioTipoCambio,perfilPreferido){
-  if(!Array.isArray(archivos)||archivos.length<1||archivos.length>10)throw new Error('Selecciona de 1 a 10 XML por lote');
+  if(!Array.isArray(archivos)||archivos.length<1||archivos.length>MAX_ARCHIVOS_XML)throw new Error(`Selecciona de 1 a ${MAX_ARCHIVOS_XML} XML por lote`);
   const filas=[], contenidos=[],vistos=new Set();
   for(let i=0;i<archivos.length;i++){
     const archivo=archivos[i];

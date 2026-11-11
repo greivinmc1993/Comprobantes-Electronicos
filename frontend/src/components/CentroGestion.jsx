@@ -28,7 +28,7 @@ export default function CentroGestion({tipo,desktop,perfil,perfiles,documentos,a
   useEffect(()=>{refrescar();},[tipo,perfil?.id]);
   if(tipo==='importacion')return <div className="qa-columns">
     <Card titulo="Centro de importación inteligente" descripcion="Cada archivo pasa por una vista previa antes de guardar datos en SQLite.">
-      <div className="qa-step"><span>1</span><div><strong>Seleccionar XML</strong><small>Máximo 10 por revisión; puedes importar más en lotes sucesivos.</small></div></div>
+      <div className="qa-step"><span>1</span><div><strong>Seleccionar XML</strong><small>Revisa todos los XML seleccionados en un solo lote, con confirmación previa.</small></div></div>
       <div className="qa-step"><span>2</span><div><strong>Detectar empresa, duplicados e impuestos</strong><small>Asigna cada archivo al perfil correcto y revisa sus observaciones.</small></div></div>
       <div className="qa-step"><span>3</span><div><strong>Confirmar importación</strong><small>Se guardan los documentos en una transacción, con número de lote.</small></div></div>
       <button className="btn btn-primary" onClick={abrirArchivos} disabled={ocupado||!perfiles.length}><Icon name="importar"/> Seleccionar archivos XML</button>
@@ -77,7 +77,7 @@ export default function CentroGestion({tipo,desktop,perfil,perfiles,documentos,a
       <button className="btn btn-light" disabled={ocupado||!vigilancia?.carpeta} onClick={()=>ejecutar(async()=>{const r=await desktop.habilitarVigilancia(!vigilancia.habilitado);setVigilancia(r);return r;},r=>r.habilitado?'Vigilancia activada':'Vigilancia desactivada')}>{vigilancia?.habilitado?'Pausar':'Activar'} vigilancia</button>
       <button className="btn btn-light" onClick={refrescar}>Buscar XML</button></div>
     <p className="qa-info">{vigilancia?.carpeta||'No se ha seleccionado carpeta'} · {vigilancia?.habilitado?'Vigilando':'Pausada'} · {vigilancia?.pendientes?.length||0} pendiente(s)</p>
-    <div className="qa-table-scroll"><table className="qa-table"><thead><tr><th>Revisar</th><th>Archivo XML</th><th>Tamaño</th></tr></thead><tbody>{(vigilancia?.pendientes||[]).map(f=><tr key={f.id}><td><input aria-label={`Seleccionar ${f.nombre}`} type="checkbox" checked={seleccion.includes(f.id)} onChange={e=>setSeleccion(v=>e.target.checked?[...v,f.id].slice(0,10):v.filter(id=>id!==f.id))}/></td><td>{f.nombre}</td><td>{(f.bytes/1024).toFixed(1)} KB</td></tr>)}</tbody></table></div>
+    <div className="qa-table-scroll"><table className="qa-table"><thead><tr><th>Revisar</th><th>Archivo XML</th><th>Tamaño</th></tr></thead><tbody>{(vigilancia?.pendientes||[]).map(f=><tr key={f.id}><td><input aria-label={`Seleccionar ${f.nombre}`} type="checkbox" checked={seleccion.includes(f.id)} onChange={e=>setSeleccion(v=>e.target.checked?[...v,f.id]:v.filter(id=>id!==f.id))}/></td><td>{f.nombre}</td><td>{(f.bytes/1024).toFixed(1)} KB</td></tr>)}</tbody></table></div>
     <button className="btn btn-primary" disabled={!seleccion.length||ocupado||!perfil?.id} onClick={()=>ejecutar(async()=>{await onVista(await desktop.previsualizarPendientes(perfil.id,seleccion));setSeleccion([]);return null;})}>Revisar {seleccion.length} XML seleccionados</button>
     <p className="texto-secundario">El seguimiento revisa la carpeta periódicamente. Solo examina archivos .xml estables de hasta 15 MB. No analiza subcarpetas.</p>
   </Card>;

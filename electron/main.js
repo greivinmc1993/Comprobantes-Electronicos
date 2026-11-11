@@ -9,6 +9,7 @@ const {crearAPI} = require('../backend/server');
 const {crearServicioTipoCambio} = require('../backend/tipo-cambio');
 const {parsearXML, procesarDocumento, identificarDocumento, datosMonedaDocumento} = require('../backend/parser');
 const {previsualizarXML} = require('../backend/previsualizacion');
+const {MAX_ARCHIVOS_XML,MAX_BYTES_XML,MAX_BYTES_LOTE} = require('../backend/limites-importacion');
 const {leerMensajeHacienda,resumenComprasVentas,analizarReferencias} = require('../backend/gestion');
 const {crearVigilancia} = require('../backend/vigilancia');
 const {validarCopia,reemplazarBaseCerrada} = require('../backend/restauracion');
@@ -65,21 +66,22 @@ function limpiarPrevisualizaciones(){
 }
 async function prepararArchivos(archivos,perfilPreferido,idsVigilancia=[]) {
   limpiarPrevisualizaciones();
-  if(preparadas.size>=6)preparadas.delete(preparadas.keys().next().value);
-  if(!Array.isArray(archivos)||archivos.length<1||archivos.length>10)throw new Error('Máximo 10 XML por vista previa');
+  // Una vista previa a la vez: evita acumular múltiples lotes grandes en RAM.
+  if(preparadas.size)preparadas.clear();
+  if(!Array.isArray(archivos)||archivos.length<1||archivos.length>MAX_ARCHIVOS_XML)throw new Error(`Máximo ${MAX_ARCHIVOS_XML} XML por vista previa`);
   let total=0;
   const files=archivos.map(f=>{
     if(typeof f.nombre!=='string'||!/\.xml$/i.test(f.nombre)||f.nombre.length>255)throw new Error('Solo archivos .xml con nombre válido');
     const bytes=Buffer.from(f.bytes||[]);
-    if(!bytes.length||bytes.length>15*1024*1024)throw new Error('Archivo vacío o mayor de 15 MB');
+    if(!bytes.length||bytes.length>MAX_BYTES_XML)throw new Error('Archivo vacío o mayor de 15 MB');
     total+=bytes.length;
     return {nombre:f.nombre,bytes};
   });
-  if(total>60*1024*1024)throw new Error('El lote supera 60 MB');
+  if(total>MAX_BYTES_LOTE)throw new Error('El lote supera 256 MB');
   const vista=await previsualizarXML(files,base.perfiles(),base,servicioTipoCambio,perfilPreferido);
   const tokenVista=crypto.randomUUID();
   preparadas.set(tokenVista,{creada:Date.now(),contenidos:vista.contenidos,filas:vista.filas,idsVigilancia});
-  return {token:tokenVista,filas:vista.filas,limite:10};
+  return {token:tokenVista,filas:vista.filas,limite:MAX_ARCHIVOS_XML};
 }
 
 function registrarPuente() {
@@ -145,7 +147,7 @@ function registrarPuente() {
     validarEmisor(e);limpiarPrevisualizaciones();
     const vista=preparadas.get(tokenVista);
     if(!vista)throw new Error('La vista previa expiró. Selecciona los archivos nuevamente.');
-    if(!Array.isArray(selecciones)||!selecciones.length||selecciones.length>10)throw new Error('Selecciona los comprobantes');
+    if(!Array.isArray(selecciones)||!selecciones.length||selecciones.length>MAX_ARCHIVOS_XML)throw new Error('Selecciona los comprobantes');
     const vistos=new Set();
     const items=selecciones.map(s=>{
       if(!Number.isSafeInteger(s.indice)||vistos.has(s.indice))throw new Error('Documento repetido en la selección');
@@ -188,7 +190,7 @@ function registrarPuente() {
     for(const archivo of archivos){
       try{
         const bytes=Buffer.from(archivo.bytes||[]);
-        if(bytes.length<1||bytes.length>15*1024*1024)throw new Error('Archivo vacío o grande');
+        if(bytes.length<1||bytes.length>MAX_BYTES_XML)throw new Error('Archivo vacío o grande');
         const mensaje=await leerMensajeHacienda(bytes.toString('utf8'),archivo.nombre);
         if(base.registrarMensajeHacienda(mensaje))nuevos++;else duplicados++;
       }catch(error){errores.push({archivo:archivo.nombre,error:error.message});}
@@ -282,15 +284,15 @@ function registrarPuente() {
   ipcMain.handle('comprobanteselectronicoscr:importar',async(e,perfilId,archivos)=>{
     validarEmisor(e);
     if (!idValido(perfilId)) throw new Error('Selecciona una empresa');
-    if (!Array.isArray(archivos) || archivos.length<1 || archivos.length>10) throw new Error('Solo se permite un lote de 1 a 10 archivos XML');
+    if (!Array.isArray(archivos) || archivos.length<1 || archivos.length>MAX_ARCHIVOS_XML) throw new Error(`Solo se permite un lote de 1 a ${MAX_ARCHIVOS_XML} archivos XML`);
     const form = new FormData();
     let totalBytes=0;
     for (const f of archivos) {
       if (typeof f.nombre !== 'string' || !/\.xml$/i.test(f.nombre)) throw new Error('Solo se permiten archivos XML');
       const bytes = Buffer.from(f.bytes || []);
-      if (!bytes.length || bytes.length>15*1024*1024) throw new Error(`Archivo vacío o mayor de 15 MB: ${f.nombre}`);
+      if (!bytes.length || bytes.length>MAX_BYTES_XML) throw new Error(`Archivo vacío o mayor de 15 MB: ${f.nombre}`);
       totalBytes += bytes.length;
-      if (totalBytes>60*1024*1024) throw new Error('El lote supera 60 MB. Importa archivos en lotes más pequeños.');
+      if (totalBytes>MAX_BYTES_LOTE) throw new Error('El lote supera 256 MB. Reduce la selección para proteger la memoria.');
       form.append('files',new Blob([bytes],{type:'application/xml'}),path.basename(f.nombre));
     }
     return peticionAPI(`/api/perfiles/${perfilId}/importar`,'POST',form);

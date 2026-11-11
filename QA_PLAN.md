@@ -158,3 +158,11 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - Playwright, en escritorio y móvil: abrir clasificación por comercio y cancelar con «Cancelar», X y Escape. La API de clasificación no debe ejecutarse, el contador pendiente no debe variar y el botón de clasificación debe seguir habilitado.
 - El caso de confirmación positiva sigue comprobando la llamada y la actualización del contador.
 - En CI, el trabajo de Chromium publica trazas, capturas y JUnit si falla un selector o una operación.
+
+### Regresión v1.4.13 — Importación en una sola revisión
+
+- Aceptar selecciones de 11, 50 y 75 XML sin fragmentación en lotes de diez, con límite máximo de 2.000 documentos.
+- Rechazar con claridad lotes superiores a 2.000 o a 256 MB acumulados, conservando el límite de 15 MB por XML.
+- Confirmar que asignación masiva y selección operan sobre todos los XML, incluso aquellos que no se muestran todavía en la tabla de vista previa.
+- Verificar que los duplicados y las empresas pendientes conservan el comportamiento previo a la v1.4.12.
+- Validar el módulo SQLite real y Playwright en GitHub Actions para escritorio y móvil.

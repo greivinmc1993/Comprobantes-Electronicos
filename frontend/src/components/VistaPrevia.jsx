@@ -9,10 +9,11 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
   const [excluidos,setExcluidos]=useState({});
   const [empresaMasiva,setEmpresaMasiva]=useState('');
   const [avisoMasivo,setAvisoMasivo]=useState('');
+  const [limiteVisibles,setLimiteVisibles]=useState(200);
   useEffect(()=>{
     setSelecciones(Object.fromEntries((vista?.filas||[]).map(f=>[f.indice,String(f.empresaSugerida||'')])));
     setExcluidos(Object.fromEntries((vista?.filas||[]).filter(f=>['error','duplicado_en_lote'].includes(f.estado)).map(f=>[f.indice,true])));
-    setEmpresaMasiva('');setAvisoMasivo('');
+    setEmpresaMasiva('');setAvisoMasivo('');setLimiteVisibles(200);
   },[vista?.token]);
   const filas=vista?.filas||[];
   const aplicables=filas.filter(f=>!['error','duplicado_en_lote'].includes(f.estado));
@@ -60,10 +61,11 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
       {avisoMasivo&&<p className="qa-bulk-notice" role="status">{avisoMasivo}</p>}
       {conAjuste>0&&<div className="qa-precision-note" role="note"><Icon name="alert"/><span>{conAjuste} XML tienen diferencias de impuestos conciliadas sin asignar a una tarifa. El impuesto neto declarado se conserva; revisa la observación fiscal para tus reportes.</span></div>}
       {conBaseAmbigua>0&&<div className="qa-precision-note" role="note"><Icon name="alert"/><span>{conBaseAmbigua} XML incluyen varias tarifas IVA en una línea sin desglose de base por tarifa. La base se conserva por separado y NO se duplica entre tarifas.</span></div>}
+      {filas.length>limiteVisibles&&<p className="texto-secundario" role="status">Mostrando {limiteVisibles} de {filas.length} comprobantes. La asignación y confirmación afectan a todos los seleccionados.</p>}
       <div className="qa-table-scroll"><table className="qa-table"><thead><tr>
         <th><input type="checkbox" aria-label="Seleccionar todos los XML válidos" disabled={cargando||!aplicables.length} checked={Boolean(aplicables.length)&&aplicables.every(f=>!excluidos[f.indice])} onChange={e=>marcarTodos(e.target.checked)}/></th>
         <th>XML / tipo</th><th>Importe</th><th>Empresa destino</th><th>Revisión</th></tr></thead>
-      <tbody>{filas.map(f=>{
+      <tbody>{filas.slice(0,limiteVisibles).map(f=>{
         const activo=!excluidos[f.indice];
         const elegido=perfiles.find(p=>String(p.id)===String(selecciones[f.indice]));
         const incompatible=activo&&Boolean(elegido)&&!empresaCompatible(f,elegido);
@@ -80,6 +82,7 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
           </td>
         </tr>;
       })}</tbody></table></div>
+      {filas.length>limiteVisibles&&<button type="button" className="btn btn-light" disabled={cargando} onClick={()=>setLimiteVisibles(n=>Math.min(n+200,filas.length))}>Mostrar más comprobantes ({filas.length-limiteVisibles} pendientes de visualizar)</button>}
       <p className="texto-secundario">Se importarán {validos.length} XML. Los documentos con errores no se incluyen; los duplicados en la empresa elegida se omiten. Se registrará el lote para poder deshacerlo.</p>
     </div>
     <div className="modal-footer"><button type="button" className="btn btn-light" onClick={onCerrar} disabled={cargando}>Cancelar</button><button type="button" className="btn btn-primary" disabled={cargando||validos.length===0||pendientes!==0} onClick={confirmar}><Icon name="check"/> {cargando?'Guardando…':`Confirmar ${validos.length} XML`}</button></div>

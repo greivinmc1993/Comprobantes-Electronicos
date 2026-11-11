@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.11-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.13-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -36,6 +36,13 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
+
+## Novedades v1.4.13 — Importación sin tandas de diez
+
+- Permite revisar y confirmar una selección completa de XML en un único lote, sin cambiar la lógica previa de detección de duplicados, empresa obligatoria o validación fiscal.
+- Mantiene los límites individuales de 15 MB por archivo y limita cada lote a 2.000 XML / 256 MB para proteger la memoria.
+- La vista previa carga 200 filas inicialmente y permite visualizar más sin modificar qué documentos se confirmarán.
+- Se conservan los comportamientos de duplicados y los avisos originales de v1.4.11.
 
 ## Novedades v1.4.11 — Confirmaciones y Playwright
 
@@ -119,7 +126,7 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - Antes de guardar se muestra una **vista previa con datos de emisor, receptor, importe, moneda y empresa sugerida por cédula**. Las importaciones son explícitas; el usuario asigna el perfil y confirma.
 - Detección de claves ya existentes en otras empresas, duplicados dentro del lote y errores por archivo. SQLite confirma cada lote en una transacción y conserva su identificador.
 - **Deshacer última importación**: tras crear un respaldo, mueve los documentos de ese lote a la Papelera. Si fueron movidos de empresa o alterados, se bloquea para impedir retirar documentos inesperados.
-- Por revisión se admiten hasta 10 XML y 60 MB; si se seleccionan más, se presentan por lotes sucesivos.
+- Por revisión se admiten hasta 2.000 XML y 256 MB acumulados; toda la selección se confirma una sola vez. El listado muestra 200 filas iniciales para conservar fluidez, pero los comandos masivos afectan a todas.
 
 **Etapa C — Clasificación y conciliación**
 
@@ -208,7 +215,7 @@ El identificador interno es `cr.comprobanteselectronicoscr.desktop`; **no** es e
 
 1. Abre **Empresas** y crea el perfil de la empresa que quieres administrar.
 2. Selecciónala en el menú lateral. Si registraste una cédula, los XML deben corresponder a su emisor o receptor.
-3. En **Importación inteligente**, selecciona hasta 10 XML por revisión, comprueba la empresa sugerida y confirma los documentos que quieres guardar. Los duplicados se identifican antes de confirmar. Puedes deshacer el último lote desde ese mismo apartado.
+3. En **Importación inteligente**, selecciona los XML que necesites por revisión (hasta 2.000 y 256 MB), comprueba la empresa sugerida y confirma los documentos que quieres guardar. Los duplicados se identifican antes de confirmar. Puedes deshacer el último lote desde ese mismo apartado.
 4. Consulta **Panel general** y configura el período para las estadísticas.
 5. En **Comprobantes**, busca por clave, comercio, fechas o tipo de documento.
 6. En **Reportes y exportaciones**, elige PDF, CSV o Excel para la empresa y filtros actuales.
