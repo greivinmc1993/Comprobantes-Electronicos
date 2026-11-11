@@ -1,0 +1,73 @@
+/* ComprobantesElectronicosCR 1.4.9 - lenguaje visual único para controles y diálogos. */
+.select-elegante {position:relative;display:block;min-width:0;width:100%;isolation:isolate}
+.select-elegante select,
+.campo .select-elegante select,
+.qa-bulk-field .select-elegante select {
+  appearance:none;-webkit-appearance:none;display:block;width:100%;max-width:100%;
+  min-width:0;min-height:40px;padding:9px 33px 9px 12px;
+  border:1px solid #d5e2f1;border-radius:10px;
+  background:linear-gradient(180deg,#fff,#f8fbff);color:#284363;
+  font-family:inherit;font-size:12px;font-weight:650;line-height:1.35;
+  cursor:pointer;box-shadow:inset 0 1px 0 #ffffffde;
+  transition:border-color .16s,box-shadow .16s,background .16s;
+}
+.select-elegante select:hover:not(:disabled) {border-color:#8fb5ef;background:#fff}
+.select-elegante select:focus-visible,.select-elegante.esta-abierto select {
+  outline:none;border-color:#4387ee;box-shadow:0 0 0 3px #397cf52b;
+}
+.select-elegante select:disabled {cursor:not-allowed;opacity:.56;box-shadow:none}
+.select-elegante select option {background:#172c46;color:#f4f8ff}
+.select-elegante-flecha {position:absolute;right:11px;top:50%;transform:translateY(-50%);color:#7189a9;display:grid;place-items:center;pointer-events:none;transition:transform .16s,color .16s}
+.select-elegante.esta-abierto .select-elegante-flecha {transform:translateY(-50%) rotate(180deg);color:#2563eb}
+.select-elegante-lista {
+  display:flex;flex-direction:column;max-height:min(350px,70vh);overflow:hidden;
+  padding:7px;background:linear-gradient(155deg,#1b324d,#10263e);
+  border:1px solid #7ba7d55a;border-radius:13px;
+  box-shadow:0 22px 55px #0d203b65,0 5px 17px #0d203b3c;
+  color:#e9f4ff;animation:selectEntrada .14s ease-out;
+}
+.select-elegante-lista:focus {outline:none}
+.select-elegante-cabecera {display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px 11px;border-bottom:1px solid #ffffff1d;color:#a4c2e5;font-size:10px;letter-spacing:.4px;font-weight:800;overflow-wrap:anywhere}
+.select-elegante-cabecera small {color:#8bb1d7;white-space:nowrap;font-size:10px;font-weight:650;letter-spacing:0}
+.select-elegante-opciones {overflow:auto;min-height:0;max-height:245px;scrollbar-width:thin;scrollbar-color:#6387ac #162f49;padding:5px 1px;overscroll-behavior:contain}
+.select-elegante-opcion {width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:38px;text-align:left;padding:9px 11px;border:1px solid transparent;border-radius:8px;background:transparent;color:#e4effd;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;overflow-wrap:anywhere;transition:background .12s,border-color .12s}
+.select-elegante-opcion svg {flex-shrink:0;color:#9bd0ff}
+.select-elegante-opcion.activa:not(:disabled),.select-elegante-opcion:hover:not(:disabled),.select-elegante-opcion:focus-visible {background:#375a81;border-color:#7baeff55;outline:none}
+.select-elegante-opcion[aria-selected="true"] {background:#234b79;color:#fff;border-color:#5a92d070}
+.select-elegante-opcion:disabled {opacity:.45;cursor:not-allowed}
+.select-elegante-busqueda {display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:9px;background:#edf4ff;margin:8px 2px 3px;color:#5f82ad}
+.select-elegante-busqueda input {border:0;outline:none;min-height:24px;width:100%;min-width:0;background:transparent;color:#244465;font-size:12px;font-family:inherit;box-shadow:none!important;padding:0!important}
+.select-elegante-busqueda input::placeholder {color:#889cb3}
+.select-elegante-ayuda {margin:4px 4px 1px;border-top:1px solid #ffffff1e;padding:8px 6px 3px;color:#8ba7c7;font-size:10px;line-height:1.5}
+.select-elegante-sin-opciones {padding:15px;color:#bed0e2;font-size:12px;text-align:center}
+@keyframes selectEntrada {from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+
+/* Uniformidad en ventanas propias: perfiles, importación, restauración y confirmaciones. */
+.modal-overlay {background:#0b1b32ad;backdrop-filter:blur(3px)}
+.company-modal {border:1px solid #e4eaf4;box-shadow:0 27px 75px #0c1f3d6e,0 3px 12px #0d2b471f}
+.modal-head {background:linear-gradient(140deg,#fff,#f9fbff)}
+.modal-footer {background:#f9fbff}
+.modal-body {scrollbar-color:#b5c9e6 transparent;scrollbar-width:thin}
+.modal-body input:not([type="checkbox"]):not([type="radio"]),
+.modal-body textarea {border-color:#d5e2f1;border-radius:9px}
+.modal-body input:focus-visible,.modal-body textarea:focus-visible {outline:none;border-color:#4387ee;box-shadow:0 0 0 3px #397cf52b}
+
+.confirmacion-fondo {z-index:160}
+.confirmacion-elegante {width:min(480px,calc(100vw - 24px));max-height:min(90vh,700px)}
+.confirmacion-elegante .modal-body {padding-top:22px;padding-bottom:22px}
+.confirmacion-mensaje {display:flex;align-items:flex-start;gap:15px;min-width:0}
+.confirmacion-icono {width:42px;height:42px;min-width:42px;display:grid;place-items:center;border-radius:13px;background:#eaf2ff;color:#2a6bd9}
+.confirmacion-mensaje p {margin:0;font-size:13px;line-height:1.7;color:#314a69;overflow-wrap:anywhere;white-space:pre-line}
+.confirmacion-elegante .modal-footer {flex-wrap:wrap}
+.confirmacion-elegante .modal-footer .btn {min-width:112px}
+@media(max-width:620px){
+  .confirmacion-elegante .modal-footer .btn {flex:1}
+  .confirmacion-elegante .modal-head,.confirmacion-elegante .modal-body,.confirmacion-elegante .modal-footer {padding-left:17px;padding-right:17px}
+  .select-elegante-lista {max-height:min(280px,56vh)}
+}
+@media(prefers-reduced-motion:reduce){.select-elegante-lista {animation:none}}
+
+/* Los selectores entre botones no deben ocupar toda la barra de acciones. */
+.seleccion-acciones > .select-elegante {width:auto;flex:0 1 240px;min-width:min(100%,185px)}
+@media(max-width:820px){.seleccion-acciones > .select-elegante {flex:1 1 185px;width:auto}}
+@media(max-width:540px){.seleccion-acciones > .select-elegante {flex:1 1 100%;min-width:100%}}

@@ -1,5 +1,6 @@
 'use strict';
 const {test,expect}=require('@playwright/test');
+const {version}=require('../package.json');
 
 // Datos sintéticos en memoria; no hay SQLite real ni datos personales en el navegador.
 test.beforeEach(async({page})=>{
@@ -230,11 +231,13 @@ test('Cupón sin IVA y total fiscal cero: referencia se registra solo con confir
  await expect(dlg.locator('.detail-gasto-admin')).toContainText('₡0,00');
  const guardarReferencia=dlg.getByRole('button',{name:'Registrar referencia como gasto manual'});
  await expect(guardarReferencia).toBeVisible();
- let mensajeConfirmacion='';
- page.once('dialog',async d=>{mensajeConfirmacion=d.message();await d.accept();});
  await guardarReferencia.click();
+ const confirmacion=page.getByRole('alertdialog',{name:'Registrar importe de referencia'});
+ await expect(confirmacion).toBeVisible();
+ await expect(confirmacion).toContainText('total ₡0,00');
+ expect(await page.evaluate(()=>window.__qaGastosGuardados.at(-1)?.montoManual??null)).toBeNull();
+ await confirmacion.getByRole('button',{name:'Registrar gasto manual'}).click();
  await expect.poll(async()=>page.evaluate(()=>window.__qaGastosGuardados.at(-1)?.montoManual)).toBe(10025);
- expect(mensajeConfirmacion).toMatch(/total ₡0,00/);
  await expect(dlg.locator('.detail-gasto-admin')).toContainText(/₡10[.,\s]025,00/);
  await expect(dlg.locator('.detail-total')).toContainText('₡0,00');
  await dlg.getByTitle('Cerrar').click();
@@ -247,18 +250,52 @@ test('Cupón sin IVA y total fiscal cero: referencia se registra solo con confir
 
 // v1.4.8 - el comercio se marca por empresa y no modifica el IVA del panel.
 test('Clasificación por comercio marca y desmarca todos sus comprobantes con confirmación',async({page})=>{
- page.on('dialog',d=>d.accept());
  const menu=page.getByRole('navigation',{name:'Secciones'});
  await menu.getByRole('button',{name:'Gastos administrativos'}).click();
  await expect(page.getByRole('heading',{name:'Clasificar gastos por comercio'})).toBeVisible();
  await page.getByRole('combobox',{name:'Comercio para gastos administrativos'}).selectOption('cedula:3101111111');
  await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Sin clasificar: 1');
  await page.getByRole('button',{name:'Agregar comercio a gastos'}).click();
+ const confirmacion=page.getByRole('alertdialog',{name:'Clasificar gastos por comercio'});
+ await expect(confirmacion).toBeVisible();
+ await confirmacion.getByRole('button',{name:'Agregar a gastos'}).click();
  await expect(page.locator('.gastos-resumen')).toContainText('₡100,00');
  await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Ya clasificados: 1');
  await page.getByRole('button',{name:'Quitar comercio de gastos'}).click();
+ await expect(confirmacion).toBeVisible();
+ await confirmacion.getByRole('button',{name:'Quitar de gastos'}).click();
  await expect(page.locator('.gastos-resumen')).toContainText('0');
  await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Sin clasificar: 1');
  await menu.getByRole('button',{name:'Panel general'}).click();
  await expect(page.locator('.iva-panel')).toContainText('₡13,00');
+});
+
+
+test('Versión del menú coincide con package.json y no depende de una cadena fija',async({page})=>{
+ await expect(page.locator('.app-version')).toHaveText(`ComprobantesElectronicosCR · v${version}`);
+});
+
+test('Los desplegables utilizan el menú personalizado, se pueden buscar y conservan el select HTML',async({page})=>{
+ const periodo=page.getByLabel('Seleccionar período del panel');
+ await periodo.click();
+ const lista=page.getByRole('listbox',{name:'Seleccionar período del panel'});
+ await expect(lista).toBeVisible();
+ await lista.getByRole('option',{name:'Seleccionar mes'}).click();
+ await expect(lista).toBeHidden();
+ await expect(periodo).toHaveValue('mes');
+ await expect(page.getByLabel('Mes del panel general')).toBeVisible();
+ await periodo.selectOption('rango');
+ await expect(periodo).toHaveValue('rango');
+});
+
+test('Confirmaciones propias permiten cancelar sin ejecutar operaciones',async({page})=>{
+ await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Gastos administrativos'}).click();
+ await page.getByRole('combobox',{name:'Comercio para gastos administrativos'}).selectOption('cedula:3101111111');
+ await page.getByRole('button',{name:'Agregar comercio a gastos'}).click();
+ const confirmacion=page.getByRole('alertdialog',{name:'Clasificar gastos por comercio'});
+ await expect(confirmacion).toBeVisible();
+ await confirmacion.getByRole('button',{name:'Cancelar'}).click();
+ await expect(confirmacion).toBeHidden();
+ expect(await page.evaluate(()=>window.__qaComercioClasificado??null)).toBeNull();
+ await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Sin clasificar: 1');
 });

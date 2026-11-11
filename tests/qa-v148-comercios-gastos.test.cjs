@@ -35,7 +35,7 @@ test('el puente exige confirmación, crea respaldo y opera solo con la empresa a
 });
 test('la interfaz pide confirmación, permite quitar y advierte sobre total fiscal cero',()=>{
  const app=fs.readFileSync(path.join(root,'frontend/src/App.jsx'),'utf8');
- assert.match(app,/Clasificar gastos por comercio/);assert.match(app,/window\.confirm\(aviso\)/);
+ assert.match(app,/Clasificar gastos por comercio/);assert.match(app,/solicitarConfirmacion\(aviso,/);
  assert.match(app,/Quitar comercio de gastos/);
  assert.match(app,/Las facturas con total cero no reciben automáticamente/);
 });

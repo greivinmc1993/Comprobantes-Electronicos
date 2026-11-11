@@ -79,6 +79,6 @@ test('reportes muestran referencia aparte del gasto manual y no la suman',()=>{
   assert.match(reports,/Referencia medio pago XML CRC \(no sumada\)/);
   assert.match(reports,/referenciaCupon\?csvMonto\(referenciaCupon\.monto\):''/);
   const app=fs.readFileSync(path.join(root,'frontend/src/App.jsx'),'utf8');
-  assert.match(app,/window\.confirm\(`El comprobante fiscal tiene total/);
+  assert.match(app,/solicitarConfirmacion\(`El comprobante fiscal tiene total/);
   assert.match(app,/Registrar referencia como gasto manual/);
 });

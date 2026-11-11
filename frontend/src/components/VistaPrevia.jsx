@@ -1,5 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import Icon from './Icon';
+import SelectElegante from './SelectElegante';
 import {crc} from '../reportes';
 import {asignarEmpresaMasiva,empresaCompatible} from './asignacion-masiva.mjs';
 
@@ -48,9 +49,9 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
       </div>
       <div className="qa-bulk-toolbar">
         <label className="qa-bulk-field"><span>Empresa para los XML marcados</span>
-          <select aria-label="Empresa para asignación masiva" value={empresaMasiva} onChange={e=>{setEmpresaMasiva(e.target.value);setAvisoMasivo('');}} disabled={cargando}>
+          <SelectElegante aria-label="Empresa para asignación masiva" value={empresaMasiva} onChange={e=>{setEmpresaMasiva(e.target.value);setAvisoMasivo('');}} disabled={cargando}>
             <option value="">Seleccionar empresa…</option>{perfiles.map(p=><option key={p.id} value={p.id}>{p.nombre}{p.cedula?' · '+p.cedula:' · sin cédula'}</option>)}
-          </select>
+          </SelectElegante>
         </label>
         <button type="button" className="btn btn-primary" onClick={asignarTodos} disabled={cargando||!empresaMasiva||!elegidos.length}><Icon name="building"/> Asignar a {elegidos.length} XML</button>
         <button type="button" className="btn btn-light" disabled={cargando||!aplicables.length} onClick={()=>marcarTodos(true)}>Marcar todos</button>
@@ -70,7 +71,7 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
           <td><input aria-label={`Incluir ${f.archivo}`} type="checkbox" disabled={cargando||['error','duplicado_en_lote'].includes(f.estado)} checked={activo} onChange={e=>setExcluidos(v=>({...v,[f.indice]:!e.target.checked}))}/></td>
           <td><strong title={f.archivo}>{f.archivo}</strong><small>{f.tipo||'No procesado'} · {f.fecha?.slice(0,10)||'—'}</small><small className="qa-code" title={f.clave}>{f.clave||''}</small></td>
           <td><strong>{f.total==null?'—':crc(f.total)}</strong><small>{f.moneda||''}</small></td>
-          <td><select aria-label={`Empresa destino para ${f.archivo}`} value={selecciones[f.indice]||''} disabled={cargando||Boolean(excluidos[f.indice])||f.estado==='error'} onChange={e=>setSelecciones(v=>({...v,[f.indice]:e.target.value}))}><option value="">Selecciona empresa</option>{perfiles.map(p=><option key={p.id} value={p.id}>{p.nombre}{f.empresasCompatibles?.includes(p.id)?' ✓':''}</option>)}</select>
+          <td><SelectElegante aria-label={`Empresa destino para ${f.archivo}`} value={selecciones[f.indice]||''} disabled={cargando||Boolean(excluidos[f.indice])||f.estado==='error'} onChange={e=>setSelecciones(v=>({...v,[f.indice]:e.target.value}))}><option value="">Selecciona empresa</option>{perfiles.map(p=><option key={p.id} value={p.id}>{p.nombre}{f.empresasCompatibles?.includes(p.id)?' ✓':''}</option>)}</SelectElegante>
             {incompatible&&<small className="qa-inline-error">La cédula de esta empresa no coincide con el emisor ni el receptor.</small>}
           </td>
           <td><span className={`qa-status ${f.estado==='listo'?'qa-ok':'qa-warning'}`}>{f.estado==='listo'?'Detectado':f.estado==='error'?'Error':f.estado==='duplicado_en_lote'?'Duplicado en lote':'Revisar empresa'}</span>

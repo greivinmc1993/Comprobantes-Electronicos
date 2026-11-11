@@ -4,15 +4,19 @@ import 'chart.js/auto';
 import Icon from './components/Icon';
 import CentroGestion from './components/CentroGestion';
 import VistaPrevia from './components/VistaPrevia';
+import SelectElegante from './components/SelectElegante';
+import ConfirmacionElegante from './components/ConfirmacionElegante';
 import {
   TASAS,TIPOS,numero,crc,fechaCorta,resumenDatos,csvDocumentos,csvIVA,csvComercios,csvLineas,
   pdfResumen,pdfComercios,pdfIVA,pdfDetalle,excelDocumentos,excelIVA,excelComercios,excelLineas,
   csvGastosAdministrativos,excelGastosAdministrativos,pdfGastosAdministrativos,resumenGastosAdministrativos
 } from './reportes';
 import './App.css';
+import './components/ui-controls.css';
 import {fechaLocal,obtenerRangoPanel,filtrarPorPeriodo,mismoMes,etiquetaRango} from './periodos.mjs';
 import {referenciaCuponNoSujeto} from './gastos-administrativos.mjs';
 
+const VERSION_APLICACION=typeof __APP_VERSION__==='undefined'?'desarrollo':__APP_VERSION__;
 const PERFIL_VACIO={nombre:'',cedula:'',correo:'',telefono:'',direccion:'',color:'#2563EB'};
 const PALETA=['#2563EB','#0891B2','#0F766E','#7C3AED','#D97706','#DC5462'];
 const NAVEGACION=[
@@ -176,6 +180,8 @@ export default function App() {
   const [iniciando,setIniciando]=useState(true);
   const [cargando,setCargando]=useState(false);
   const [aviso,setAviso]=useState(null);
+  const [confirmacionVisual,setConfirmacionVisual]=useState(null);
+  const confirmacionPendiente=useRef(null);
   const [seleccionado,setSeleccionado]=useState(null);
   const [gastoManualInput,setGastoManualInput]=useState('');
   const [comercioParaGastos,setComercioParaGastos]=useState('');
@@ -226,6 +232,23 @@ export default function App() {
   const perfil=perfiles.find(p=>p.id===perfilId)||{id:null,nombre:'Ninguna empresa seleccionada',color:'#64748B',cedula:''};
 
   const mensaje=(texto,tipo='ok')=>setAviso({texto,tipo});
+  const solicitarConfirmacion=(texto,config={})=>new Promise(resolve=>{
+    if(confirmacionPendiente.current){resolve(false);return;}
+    confirmacionPendiente.current=resolve;
+    setConfirmacionVisual({mensaje:texto,...config});
+  });
+  const responderConfirmacion=acepta=>{
+    const resolver=confirmacionPendiente.current;
+    confirmacionPendiente.current=null;
+    setConfirmacionVisual(null);
+    resolver?.(acepta);
+  };
+  useEffect(()=>()=>{
+    // Si el componente se desmonta, ninguna confirmación puede quedar abierta.
+    const resolver=confirmacionPendiente.current;
+    confirmacionPendiente.current=null;
+    resolver?.(false);
+  },[]);
   const recuperarPerfiles=async()=>{
     if(!desktop) return [];
     const resp=await desktop.listarPerfiles();
@@ -465,7 +488,7 @@ export default function App() {
     finally{setCargando(false);}
   };
   const borrarDocumento=async f=>{
-    if(!window.confirm(`¿Enviar el comprobante ${f.consecutivo||f.clave||f.id} de «${perfil.nombre}» a la Papelera? Podrás restaurarlo después. Se generará un respaldo previo.`))return;
+    if(!await solicitarConfirmacion(`¿Enviar el comprobante ${f.consecutivo||f.clave||f.id} de «${perfil.nombre}» a la Papelera? Podrás restaurarlo después. Se generará un respaldo previo.`,{titulo:'Enviar a Papelera',accion:'Enviar a Papelera',peligro:true}))return;
     setCargando(true);
     try {
       await desktop.enviarPapelera(perfilId,[f.id]);
@@ -501,7 +524,7 @@ export default function App() {
     const ids=marcadosPapelera.filter(id=>papelera.some(x=>x.id===id));
     const destino=Number(destinoPapelera);
     if(!ids.length || !destino) return mensaje('Selecciona documentos de la Papelera y una empresa destino.','warn');
-    if(!window.confirm(`¿Restaurar ${ids.length} comprobante(s) en «${perfiles.find(p=>p.id===destino)?.nombre}»? Se verificará la cédula y que no haya duplicados. Se creará respaldo.`))return;
+    if(!await solicitarConfirmacion(`¿Restaurar ${ids.length} comprobante(s) en «${perfiles.find(p=>p.id===destino)?.nombre}»? Se verificará la cédula y que no haya duplicados. Se creará respaldo.`,{titulo:'Restaurar comprobantes',accion:'Restaurar'}))return;
     setCargando(true);
     try {
       const res=await desktop.restaurarPapelera(ids,destino);
@@ -513,7 +536,7 @@ export default function App() {
   const moverDocumento=async()=>{
     const dest=Number(destinoId);
     if(!dest || !seleccionado)return;
-    if(!window.confirm(`¿Mover este comprobante desde «${perfil.nombre}» hacia «${perfiles.find(p=>p.id===dest)?.nombre}»?`))return;
+    if(!await solicitarConfirmacion(`¿Mover este comprobante desde «${perfil.nombre}» hacia «${perfiles.find(p=>p.id===dest)?.nombre}»?`,{titulo:'Mover comprobante',accion:'Mover comprobante'}))return;
     setCargando(true);
     try{await desktop.moverDocumento(perfilId,seleccionado.id,dest);await recargar();await recuperarPerfiles();setSeleccionado(null);setDestinoId('');mensaje('Comprobante movido a la empresa seleccionada.');}
     catch(err){mensaje(err.message,'error');}finally{setCargando(false);}
@@ -547,7 +570,7 @@ export default function App() {
     const aviso=habilitado
       ? `¿Marcar ${pendientes} documento(s) de «${nombre}» como gastos administrativos en «${perfil.nombre}»? Incluye notas de crédito y todos los períodos. Los importes manuales existentes se conservan. Las facturas en cero requieren revisión manual. El IVA del Panel general no cambia.`
       : `¿Quitar ${pendientes} documento(s) de «${nombre}» de gastos administrativos en «${perfil.nombre}»? También se eliminarán sus importes administrativos manuales, pero no se alterarán los XML ni el IVA.`;
-    if(!window.confirm(aviso))return;
+    if(!await solicitarConfirmacion(aviso,{titulo:'Clasificar gastos por comercio',accion:habilitado?'Agregar a gastos':'Quitar de gastos',peligro:!habilitado}))return;
     setTrabajandoComercio(true);
     try{
       const resultado=await desktop.clasificarGastosComercio(perfilId,comercioGastosElegido.clave,habilitado,pendientes,true);
@@ -597,7 +620,7 @@ export default function App() {
       <nav className="nav-list" aria-label="Secciones">
         {NAVEGACION.map(n=><button key={n.id} type="button" aria-label={n.titulo} aria-current={seccion===n.id?'page':undefined} className={`nav-item ${seccion===n.id?'nav-activo':''}`} onClick={()=>setSeccion(n.id)}><Icon name={n.icono} size={19}/><span>{n.titulo}</span>{n.id==='documentos'&&<span className="nav-count" aria-hidden="true">{todos.length}</span>}</button>)}
       </nav>
-      <div className="sidebar-bottom"><div className="sidebar-card"><Icon name="shield" size={21}/><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div><button className="sidebar-backup" onClick={respaldo} disabled={cargando}><Icon name="database" size={18}/> Respaldar base SQLite</button><span className="app-version">ComprobantesElectronicosCR · v1.4.5</span></div>
+      <div className="sidebar-bottom"><div className="sidebar-card"><Icon name="shield" size={21}/><strong>Tus datos, en tu equipo</strong><p>Historial guardado en SQLite. No se envía a la nube.</p></div><button className="sidebar-backup" onClick={respaldo} disabled={cargando}><Icon name="database" size={18}/> Respaldar base SQLite</button><span className="app-version">ComprobantesElectronicosCR · v{VERSION_APLICACION}</span></div>
     </aside>
 
     <div className="workspace">
@@ -624,7 +647,7 @@ export default function App() {
             </div>
             <div className="periodo-controles">
               <label className="periodo-control"><span>Mostrar información de</span>
-                <select aria-label="Seleccionar período del panel" value={filtroPanel.modo}
+                <SelectElegante aria-label="Seleccionar período del panel" value={filtroPanel.modo}
                   onChange={e=>setFiltroPanel(f=>({...f,modo:e.target.value}))}>
                   <option value="todos">Todo el historial</option>
                   <option value="actual">Este mes</option>
@@ -633,7 +656,7 @@ export default function App() {
                   <option value="anio">Este año</option>
                   <option value="mes">Seleccionar mes</option>
                   <option value="rango">Rango personalizado</option>
-                </select>
+                </SelectElegante>
               </label>
               {filtroPanel.modo==='mes'&&<label className="periodo-control"><span>Mes y año</span>
                 <input aria-label="Mes del panel general" type="month" value={filtroPanel.mes} onChange={e=>setFiltroPanel(f=>({...f,mes:e.target.value}))}/>
@@ -679,9 +702,9 @@ export default function App() {
 
         {(seccion==='documentos'||seccion==='reportes'||seccion==='gastos')&&<section className="surface-card filtro-panel"><div className="filtros-header"><strong><Icon name="filter" size={18}/> Filtros de información</strong><button className="text-button" disabled={!hayFiltros} onClick={limpiar}>Limpiar filtros <Icon name="close" size={15}/></button></div><div className="filtros-grid">
           <Campo titulo="Buscar comprobantes"><div className="input-icon"><Icon name="search" size={17}/><input placeholder="Clave, comercio, nombre..." value={textoBuscar} onChange={e=>{setTextoBuscar(e.target.value);setPagina(1);}}/></div></Campo>
-          <Campo titulo="Tipo de comprobante"><select value={filtroTipo} onChange={e=>{setFiltroTipo(e.target.value);setPagina(1);}}><option value="TODOS">Todos los tipos</option>{TIPOS.map(t=><option key={t}>{t}</option>)}</select></Campo>
-          <Campo titulo="Comercio emisor"><select value={filtroComercio} onChange={e=>{setFiltroComercio(e.target.value);setPagina(1);}}><option value="TODOS">Todos los comercios</option>{comerciosDisponibles.map(t=><option key={t} value={t}>{t}</option>)}</select></Campo>
-          <Campo titulo="Tarifa de IVA"><select value={filtroIVA} onChange={e=>{setFiltroIVA(e.target.value);setPagina(1);}}><option value="TODOS">Todas las tarifas</option>{TASAS.map(t=><option key={t} value={t}>{t}%</option>)}</select></Campo>
+          <Campo titulo="Tipo de comprobante"><SelectElegante value={filtroTipo} onChange={e=>{setFiltroTipo(e.target.value);setPagina(1);}}><option value="TODOS">Todos los tipos</option>{TIPOS.map(t=><option key={t}>{t}</option>)}</SelectElegante></Campo>
+          <Campo titulo="Comercio emisor"><SelectElegante value={filtroComercio} onChange={e=>{setFiltroComercio(e.target.value);setPagina(1);}}><option value="TODOS">Todos los comercios</option>{comerciosDisponibles.map(t=><option key={t} value={t}>{t}</option>)}</SelectElegante></Campo>
+          <Campo titulo="Tarifa de IVA"><SelectElegante value={filtroIVA} onChange={e=>{setFiltroIVA(e.target.value);setPagina(1);}}><option value="TODOS">Todas las tarifas</option>{TASAS.map(t=><option key={t} value={t}>{t}%</option>)}</SelectElegante></Campo>
           <Campo titulo="Desde"><input type="date" value={desde} max={hasta||undefined} onChange={e=>{setDesde(e.target.value);setPagina(1);}}/></Campo>
           <Campo titulo="Hasta"><input type="date" value={hasta} min={desde||undefined} onChange={e=>{setHasta(e.target.value);setPagina(1);}}/></Campo>
         </div><div className="filtros-summary"><Icon name="info" size={14}/> {filtrados.length} comprobante(s) coinciden con los filtros. Las exportaciones respetan esta selección.</div></section>}
@@ -690,9 +713,9 @@ export default function App() {
           <div className="seleccion-info"><Icon name="check" size={17}/><strong>{marcados.length} seleccionados</strong><span>Marca las facturas equivocadas; también puedes buscar y filtrar antes de seleccionarlas.</span></div>
           <div className="seleccion-acciones">
             <Boton clase="btn-light" disabled={!marcados.length||cargando} onClick={()=>setMarcados([])}>Limpiar selección</Boton>
-            <select aria-label="Empresa destino para trasladar selección" value={destinoLote} onChange={e=>setDestinoLote(e.target.value)}>
+            <SelectElegante aria-label="Empresa destino para trasladar selección" value={destinoLote} onChange={e=>setDestinoLote(e.target.value)}>
               <option value="">Empresa destino...</option>{perfiles.filter(p=>p.id!==perfilId).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
+            </SelectElegante>
             <Boton icono="transfer" clase="btn-light" disabled={!marcados.length||!destinoLote||cargando} onClick={()=>abrirOperacionLote('mover')}>Mover seleccionados</Boton>
             <Boton icono="trash" clase="btn-danger-light" disabled={!marcados.length||cargando} onClick={()=>abrirOperacionLote('papelera')}>Enviar a Papelera</Boton>
           </div>
@@ -706,7 +729,7 @@ export default function App() {
             <div className="seleccion-lote">
               <label className="papelera-marcar"><input type="checkbox" aria-label="Seleccionar toda la Papelera" checked={marcadosPapelera.length===papelera.length} onChange={e=>setMarcadosPapelera(e.target.checked?papelera.map(x=>x.id):[])}/> Seleccionar todos ({papelera.length})</label>
               <div className="seleccion-acciones"><strong>{marcadosPapelera.length} marcados</strong>
-                <select aria-label="Empresa para restaurar los comprobantes" value={destinoPapelera} onChange={e=>setDestinoPapelera(e.target.value)}><option value="">Restaurar en empresa...</option>{perfiles.map(x=><option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
+                <SelectElegante aria-label="Empresa para restaurar los comprobantes" value={destinoPapelera} onChange={e=>setDestinoPapelera(e.target.value)}><option value="">Restaurar en empresa...</option>{perfiles.map(x=><option key={x.id} value={x.id}>{x.nombre}</option>)}</SelectElegante>
                 <Boton icono="refresh" disabled={!marcadosPapelera.length||!destinoPapelera||cargando} onClick={restaurarSeleccionados}>Restaurar seleccionados</Boton>
               </div>
             </div>
@@ -731,11 +754,11 @@ export default function App() {
             </div><span className="chip-neutro">Por empresa</span></div>
             <div className="gastos-comercios-contenido">
               <Campo titulo="Selecciona el comercio emisor">
-                <select aria-label="Comercio para gastos administrativos" value={comercioParaGastos}
+                <SelectElegante aria-label="Comercio para gastos administrativos" value={comercioParaGastos}
                   onChange={e=>setComercioParaGastos(e.target.value)} disabled={trabajandoComercio}>
                   <option value="">Seleccionar comercio...</option>
                   {comerciosGastos.map(c=><option key={c.clave} value={c.clave}>{c.nombre}{c.cedula?` · ${c.cedula}`:''} ({c.total})</option>)}
-                </select>
+                </SelectElegante>
               </Campo>
               {comercioGastosElegido&&<div className="gastos-comercios-resumen" role="status">
                 <span>Total: <strong>{comercioGastosElegido.total}</strong></span>
@@ -833,8 +856,8 @@ export default function App() {
             <section className="surface-card backup-config">
               <div className="section-head"><div><h2>Programación automática</h2><p>Configura la frecuencia y cuántas copias automáticas conservar.</p></div><Icon name="settings" size={22}/></div>
               <label className="backup-toggle"><input type="checkbox" checked={configRespaldos.habilitado} onChange={e=>setConfigRespaldos(v=>({...v,habilitado:e.target.checked}))}/><span><strong>Activar respaldos automáticos</strong><small>Al iniciar o según el intervalo elegido, siempre que el programa esté abierto.</small></span></label>
-              <div className="backup-options"><Campo titulo="Frecuencia"><select value={configRespaldos.frecuencia} disabled={!configRespaldos.habilitado} onChange={e=>setConfigRespaldos(v=>({...v,frecuencia:e.target.value}))}><option value="inicio">En cada apertura del programa</option><option value="diario">Diario (cada 24 horas)</option><option value="semanal">Semanal (cada 7 días)</option></select></Campo>
-              <Campo titulo="Conservar últimas copias automáticas"><select value={configRespaldos.retener} onChange={e=>setConfigRespaldos(v=>({...v,retener:Number(e.target.value)}))}>{[5,14,30,60].map(n=><option key={n} value={n}>{n} copias</option>)}</select></Campo></div>
+              <div className="backup-options"><Campo titulo="Frecuencia"><SelectElegante value={configRespaldos.frecuencia} disabled={!configRespaldos.habilitado} onChange={e=>setConfigRespaldos(v=>({...v,frecuencia:e.target.value}))}><option value="inicio">En cada apertura del programa</option><option value="diario">Diario (cada 24 horas)</option><option value="semanal">Semanal (cada 7 días)</option></SelectElegante></Campo>
+              <Campo titulo="Conservar últimas copias automáticas"><SelectElegante value={configRespaldos.retener} onChange={e=>setConfigRespaldos(v=>({...v,retener:Number(e.target.value)}))}>{[5,14,30,60].map(n=><option key={n} value={n}>{n} copias</option>)}</SelectElegante></Campo></div>
               <div className="backup-folder"><small>CARPETA DE RESPALDOS</small><code title={estadoRespaldos?.carpeta}>{estadoRespaldos?.carpeta||'Cargando...'}</code><div className="actions-inline"><Boton clase="btn-light" icono="folder" onClick={cambiarCarpetaRespaldos} disabled={trabajandoRespaldo}>Cambiar carpeta</Boton><Boton clase="btn-light" icono="external" onClick={abrirCarpetaRespaldos}>Abrir carpeta</Boton></div></div>
               <div className="backup-config-actions"><Boton icono="check" onClick={guardarConfigRespaldos} disabled={trabajandoRespaldo||!estadoRespaldos}>Guardar configuración</Boton><Boton icono="download" clase="btn-light" onClick={respaldo} disabled={trabajandoRespaldo}>Guardar copia en...</Boton></div>
             </section>
@@ -898,9 +921,9 @@ export default function App() {
         {seleccionado.gastoAdministrativo&&referenciaCuponNoSujeto(seleccionado)&&
           <div className="cupon-confirmacion">
             <p>Referencia de medio de pago en este XML: <strong>{crc(referenciaCuponNoSujeto(seleccionado).monto)}</strong>. No constituye automáticamente un gasto deducible.</p>
-            <Boton clase="btn-light" disabled={cargando} onClick={()=>{
+            <Boton clase="btn-light" disabled={cargando} onClick={async()=>{
               const importe=referenciaCuponNoSujeto(seleccionado).monto;
-              if(!window.confirm(`El comprobante fiscal tiene total ₡0,00. ¿Registrar ₡${importe.toLocaleString('es-CR',{minimumFractionDigits:2})} como referencia manual de gasto administrativo, tras comprobar el soporte contable? El XML y el IVA no cambiarán.`)) return;
+              if(!await solicitarConfirmacion(`El comprobante fiscal tiene total ₡0,00. ¿Registrar ₡${importe.toLocaleString('es-CR',{minimumFractionDigits:2})} como referencia manual de gasto administrativo, tras comprobar el soporte contable? El XML y el IVA no cambiarán.`,{titulo:'Registrar importe de referencia',accion:'Registrar gasto manual'})) return;
               setGastoManualInput(String(importe));
               guardarGastoAdministrativo(seleccionado,true,String(importe));
             }}>Registrar referencia como gasto manual</Boton>
@@ -913,7 +936,7 @@ export default function App() {
           <small>En blanco utiliza la venta neta que declara el XML. Si introduces un monto manual, solo sustituye la base del reporte administrativo; el IVA real permanece sin cambios.</small>
         </div>}
       </section>
-      <h3 className="drawer-section-title">Organización</h3><div className="mover-documento"><Campo titulo="Mover comprobante a otra empresa"><select value={destinoId} onChange={e=>setDestinoId(e.target.value)}><option value="">Seleccionar empresa destino</option>{perfiles.filter(p=>p.id!==perfilId).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}</select></Campo><Boton icono="transfer" clase="btn-light" disabled={!destinoId||cargando} onClick={moverDocumento}>Mover</Boton></div>
+      <h3 className="drawer-section-title">Organización</h3><div className="mover-documento"><Campo titulo="Mover comprobante a otra empresa"><SelectElegante value={destinoId} onChange={e=>setDestinoId(e.target.value)}><option value="">Seleccionar empresa destino</option>{perfiles.filter(p=>p.id!==perfilId).map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}</SelectElegante></Campo><Boton icono="transfer" clase="btn-light" disabled={!destinoId||cargando} onClick={moverDocumento}>Mover</Boton></div>
       </div><div className="drawer-footer"><Boton icono="download" onClick={()=>{try{pdfDetalle(perfil,seleccionado);}catch(err){mensaje(err.message,'error');}}}>PDF detalle</Boton><Boton icono="trash" clase="btn-danger-light" disabled={cargando} onClick={()=>borrarDocumento(seleccionado)}>Enviar a Papelera</Boton></div></aside></div>}
 
     {operacionLote&&<div className="overlay modal-overlay"><form className="company-modal delete-company-modal" onSubmit={ejecutarOperacionLote} role="dialog" aria-modal="true" aria-label="Confirmar operación de comprobantes">
@@ -933,7 +956,7 @@ export default function App() {
           <div className="delete-summary"><span className="delete-company-avatar" style={{background:empresaEliminar.color}}>{empresaEliminar.nombre.slice(0,1).toUpperCase()}</span><div><strong>{empresaEliminar.nombre}</strong><small>{empresaEliminar.cantidad||0} comprobantes asociados</small></div></div>
           <fieldset className="delete-modes"><legend>¿Qué hacemos con los comprobantes?</legend>
           {perfiles.some(p=>p.id!==empresaEliminar.id)&&<label><input type="radio" name="modoEliminar" value="mover" checked={modoEliminar==='mover'} onChange={()=>setModoEliminar('mover')}/><span><strong>Conservar los documentos (recomendado)</strong><small>Trasladarlos a otra empresa registrada. Se validarán cédulas y duplicados.</small></span></label>}
-          {modoEliminar==='mover'&&<Campo titulo="Empresa que recibirá los comprobantes"><select value={destinoEliminar} onChange={e=>setDestinoEliminar(e.target.value)} required>{perfiles.filter(p=>p.id!==empresaEliminar.id).map(p=><option value={p.id} key={p.id}>{p.nombre}</option>)}</select></Campo>}
+          {modoEliminar==='mover'&&<Campo titulo="Empresa que recibirá los comprobantes"><SelectElegante value={destinoEliminar} onChange={e=>setDestinoEliminar(e.target.value)} required>{perfiles.filter(p=>p.id!==empresaEliminar.id).map(p=><option value={p.id} key={p.id}>{p.nombre}</option>)}</SelectElegante></Campo>}
           <label><input type="radio" name="modoEliminar" value="eliminar" checked={modoEliminar==='eliminar'} onChange={()=>setModoEliminar('eliminar')}/><span><strong>Eliminar empresa y sus documentos</strong><small>Se eliminarán {empresaEliminar.cantidad||0} comprobantes de esta empresa. Solo podrás recuperarlos desde un respaldo.</small></span></label></fieldset>
           <div className="info-note"><Icon name="shield" size={18}/><span>Antes de confirmar se generará y verificará un respaldo SQLite completo, incluyendo todas las empresas. Si falla, no se borrará nada.</span></div>
           <Campo titulo={`Escribe exactamente «${empresaEliminar.nombre}» para confirmar`}><input autoFocus autoComplete="off" spellCheck="false" value={nombreEliminar} onChange={e=>setNombreEliminar(e.target.value)} placeholder="Nombre exacto de la empresa"/></Campo>
@@ -944,5 +967,6 @@ export default function App() {
     </div>}
 
     {modalPerfil&&<div className="overlay modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setModalPerfil(null);}}><form className="company-modal" onSubmit={guardarPerfil} role="dialog" aria-modal="true" aria-label="Formulario de empresa"><div className="modal-head"><div><div className="eyebrow">PERFILES INDEPENDIENTES</div><h2>{modalPerfil==='nuevo'?'Registrar nueva empresa':'Editar empresa'}</h2><p>Los comprobantes se guardarán solo en este perfil.</p></div><button type="button" className="icon-button" onClick={()=>setModalPerfil(null)} aria-label="Cerrar"><Icon name="close" size={20}/></button></div><div className="modal-body">{errorPerfil&&<div className="alerta aviso-error" role="alert"><Icon name="alert" size={17}/><span>{errorPerfil}</span></div>}<Campo titulo="Nombre de la empresa *"><input autoFocus maxLength={120} required placeholder="Ej. Comercial La Esperanza S.A." value={formPerfil.nombre} onChange={e=>setFormPerfil({...formPerfil,nombre:e.target.value})}/></Campo><div className="modal-columns"><Campo titulo="Cédula jurídica o física (opcional)"><input maxLength={30} placeholder="3101234567" value={formPerfil.cedula} onChange={e=>setFormPerfil({...formPerfil,cedula:e.target.value})}/></Campo><Campo titulo="Teléfono"><input maxLength={40} placeholder="8888-8888" value={formPerfil.telefono} onChange={e=>setFormPerfil({...formPerfil,telefono:e.target.value})}/></Campo></div><Campo titulo="Correo electrónico"><input type="email" maxLength={160} placeholder="contabilidad@empresa.com" value={formPerfil.correo} onChange={e=>setFormPerfil({...formPerfil,correo:e.target.value})}/></Campo><Campo titulo="Dirección"><textarea rows={2} maxLength={320} placeholder="Ubicación de la empresa" value={formPerfil.direccion} onChange={e=>setFormPerfil({...formPerfil,direccion:e.target.value})}/></Campo><div className="campo"><span>Color de identificación</span><div className="color-options">{PALETA.map(c=><button key={c} type="button" className={`color-option ${formPerfil.color===c?'selected':''}`} style={{background:c}} onClick={()=>setFormPerfil({...formPerfil,color:c})} title={c}>{formPerfil.color===c&&<Icon name="check" size={17}/>}</button>)}</div></div><div className="info-note"><Icon name="info" size={17}/><span>Si indicas una cédula, solo se importarán comprobantes donde la empresa aparezca como emisor o receptor. Esto evita mezclar empresas por error.</span></div></div><div className="modal-footer"><Boton clase="btn-light" type="button" onClick={()=>setModalPerfil(null)}>Cancelar</Boton><Boton type="submit" icono="check" disabled={cargando}>{cargando?'Guardando...':modalPerfil==='nuevo'?'Crear empresa':'Guardar cambios'}</Boton></div></form></div>}
+    <ConfirmacionElegante datos={confirmacionVisual} onResponder={responderConfirmacion}/>
   </div>;
 }

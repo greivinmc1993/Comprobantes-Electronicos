@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.7-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.9-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -36,6 +36,13 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
+
+## Novedades v1.4.9 — Interfaz unificada y versión automática
+
+- La interfaz lee la versión desde `package.json` durante el build de Vite, sin mantener números fijos en el menú lateral.
+- Desplegables uniformes en filtros, empresas, respaldos, importación inteligente y movimientos, con teclado, búsqueda en listas extensas y accesibilidad.
+- Confirmaciones de operaciones con diálogos propios, en lugar de los avisos nativos del navegador; se conservan los respaldos y las validaciones existentes.
+- Los diálogos de Windows que abren archivos o carpetas siguen siendo nativos por seguridad.
 
 ## Novedades v1.4.7 — Pruebas estables de cupón y gastos administrativos
 
@@ -179,7 +186,7 @@ npm run dist:win
 El instalador se guardará en:
 
 ```text
-release/ComprobantesElectronicosCR-Setup-1.4.7-x64.exe
+release/ComprobantesElectronicosCR-Setup-1.4.9-x64.exe
 ```
 
 El identificador interno es `cr.comprobanteselectronicoscr.desktop`; **no** es el identificador de FacturaCR. El instalador no está firmado digitalmente. Windows SmartScreen puede advertir sobre un editor desconocido.

@@ -1,5 +1,12 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.9 — Interfaz coherente y numeración automática
+
+- Todos los selectores HTML principales usan un mismo desplegable visual, con búsqueda y navegación por teclado; mantiene el `<select>` real para accesibilidad y QA.
+- Sustituidas las confirmaciones `window.confirm` por un diálogo seguro y consistente.
+- Versión del menú lateral vinculada automáticamente a `package.json` mediante Vite.
+- Pruebas nuevas de regresión de configuración, accesibilidad y estilos.
+
 ## 1.4.8 — Gastos administrativos por comercio
 
 - Selección de un comercio por cédula fiscal del emisor, con nombre normalizado solo cuando la cédula falta.

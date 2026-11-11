@@ -136,3 +136,11 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 ### QA v1.4.8 — Clasificación por comercio
 
 `tests/qa-v148-comercios-gastos.test.cjs` verifica agrupación por cédula, fallback de nombre, aislamiento y reversibilidad. `tests/qa-v148-comercios-sqlite.integration.test.cjs` requiere better-sqlite3 real y prueba transacciones, persistencia, auditoría e importes manuales; corre en la matriz Windows/Linux de GitHub Actions.
+
+## QA de interfaz v1.4.9
+
+- Verificar que la versión visible en el menú lateral coincida con `package.json` y el instalador NSIS.
+- Verificar desplegables de empresas, filtros, importación y respaldos en escritorio y móvil, con búsqueda y teclado.
+- Confirmaciones de Papelera, traslados, cupón y clasificación masiva: Cancelar no puede modificar SQLite.
+- Los tests deben seguir funcionando con `selectOption` del selector HTML real y con los diálogos propios.
+- Los selectores de archivos y carpetas de Windows conservan el diálogo nativo del sistema por seguridad.
