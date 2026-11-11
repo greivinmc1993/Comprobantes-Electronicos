@@ -1,6 +1,7 @@
 import React, {useEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import Icon from './Icon';
+import {scrollEsInterno} from './scroll-selector.mjs';
 
 /**
  * Selector coherente con la aplicación. Mantiene un <select> REAL, visible y
@@ -48,14 +49,31 @@ export default function SelectElegante({children,value,onChange,disabled=false,c
     if(!abierto)return undefined;
     const fuera=e=>{if(!raiz.current?.contains(e.target)&&!menu.current?.contains(e.target))setAbierto(false);};
     const cerrar=()=>setAbierto(false);
+    // La captura de 'scroll' también recibe eventos de la lista (incluido el
+    // scroll con la rueda, touchpad, táctil y teclado). No cerrar el menú en
+    // esos casos: solo cuando se desplaza un contenedor EXTERNO y el menú
+    // anclado al selector podría quedar fuera de posición.
+    const scrollExterno=e=>{if(!scrollEsInterno(e.target,raiz.current,menu.current))cerrar();};
     const esc=e=>{if(e.key==='Escape'){e.preventDefault();cerrar();nativo.current?.focus({preventScroll:true});}};
     document.addEventListener('pointerdown',fuera);
     document.addEventListener('keydown',esc);
     window.addEventListener('resize',cerrar);
-    window.addEventListener('scroll',cerrar,true);
-    return()=>{document.removeEventListener('pointerdown',fuera);document.removeEventListener('keydown',esc);window.removeEventListener('resize',cerrar);window.removeEventListener('scroll',cerrar,true);};
+    window.addEventListener('scroll',scrollExterno,true);
+    return()=>{document.removeEventListener('pointerdown',fuera);document.removeEventListener('keydown',esc);window.removeEventListener('resize',cerrar);window.removeEventListener('scroll',scrollExterno,true);};
   },[abierto]);
   useEffect(()=>{if(abierto)menu.current?.focus({preventScroll:true});},[abierto]);
+  // Al navegar con las flechas, desplazar solo el contenedor de opciones.
+  // No mover la página ni cerrar el desplegable.
+  useEffect(()=>{
+    if(!abierto)return;
+    const contenedor=menu.current?.querySelector('.select-elegante-opciones');
+    const opcion=contenedor?.querySelectorAll('.select-elegante-opcion')?.[actual];
+    if(!contenedor||!opcion)return;
+    const visible=contenedor.getBoundingClientRect();
+    const item=opcion.getBoundingClientRect();
+    if(item.bottom>visible.bottom)contenedor.scrollTop+=item.bottom-visible.bottom;
+    else if(item.top<visible.top)contenedor.scrollTop-=visible.top-item.top;
+  },[abierto,actual,filtro]);
   useEffect(()=>setAbierto(false),[value,disabled]);
   const manejarTecla=e=>{
     if(!abierto){

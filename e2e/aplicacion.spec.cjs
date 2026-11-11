@@ -299,3 +299,28 @@ test('Confirmaciones propias permiten cancelar sin ejecutar operaciones',async({
  expect(await page.evaluate(()=>window.__qaComercioClasificado??null)).toBeNull();
  await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Sin clasificar: 1');
 });
+
+// v1.4.10: La rueda del mouse debe desplazar las opciones, no cerrar el popup.
+// Este escenario corre en los proyectos Chromium escritorio y móvil.
+test('Scroll en el menú de tipos no cierra el desplegable',async({page})=>{
+ const navegacion=page.getByRole('navigation',{name:'Secciones'});
+ await navegacion.getByRole('button',{name:'Comprobantes',exact:true}).click();
+ const campo=page.getByRole('combobox',{name:'Tipo de comprobante'});
+ await campo.click();
+ const lista=page.getByRole('listbox',{name:'Tipo de comprobante'});
+ const opciones=lista.locator('.select-elegante-opciones');
+ await expect(lista).toBeVisible();
+ await expect.poll(async()=>opciones.evaluate(node=>node.scrollHeight-node.clientHeight)).toBeGreaterThan(0);
+ await opciones.hover();
+ await page.mouse.wheel(0,250);
+ await expect.poll(async()=>opciones.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+ await expect(lista).toBeVisible();
+ // Al mover una opción a la vista, sigue abierto y se puede seleccionar.
+ await lista.getByRole('option',{name:'Nota de crédito'}).click();
+ await expect(lista).toBeHidden();
+ await expect(campo).toHaveValue('Nota de crédito');
+ await campo.click();
+ await expect(lista).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(lista).toBeHidden();
+});

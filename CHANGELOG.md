@@ -1,5 +1,13 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.10 — Desplegables con desplazamiento estable
+
+- Corregido el menú que se cerraba al usar rueda de mouse, trackpad o desplazamiento táctil dentro de la lista de opciones.
+- Se distingue el scroll interno del desplazamiento externo; se conserva el cierre al pulsar Escape, seleccionar una opción o hacer clic fuera.
+- La navegación con flechas mantiene visible la opción activa sin desplazar la página.
+- Pruebas unitarias de lógica del scroll y prueba Playwright sobre el filtro de tipo de comprobante para escritorio y móvil, incluidas en GitHub Actions.
+- Se preservan los datos SQLite, la identidad NSIS y todas las funciones existentes.
+
 ## 1.4.9 — Interfaz coherente y numeración automática
 
 - Todos los selectores HTML principales usan un mismo desplegable visual, con búsqueda y navegación por teclado; mantiene el `<select>` real para accesibilidad y QA.

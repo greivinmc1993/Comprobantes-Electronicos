@@ -1,7 +1,7 @@
 {
   "name": "comprobanteselectronicoscr-desktop",
   "productName": "ComprobantesElectronicosCR",
-  "version": "1.4.9",
+  "version": "1.4.10",
   "description": "Gestor XML de Hacienda 4.4 para Windows: importación revisada, compras y ventas, conciliación, respuestas Hacienda, auditoría, respaldos y carpetas vigiladas",
   "private": true,
   "main": "electron/main.js",
