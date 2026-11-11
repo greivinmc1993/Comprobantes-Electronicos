@@ -1,5 +1,11 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.14 — Espaciado de Gastos administrativos
+- Se agrega relleno interior a los títulos y contenidos de las secciones «Clasificar gastos por comercio» y «Reporte de gastos administrativos».
+- Mejora de márgenes en avisos, exportaciones y estados vacíos; ajustes responsive para móvil.
+- Sin cambios en SQLite, impuestos, informes, importación, instalador o lógica fiscal.
+- Regresiones QA de espaciado en CSS y prueba visual Playwright.
+
 ## 1.4.13 — Una revisión para todos los XML, manteniendo la validación anterior
 
 - Base funcional: v1.4.11. **Se revierten los cambios de la v1.4.12 relacionados con la omisión parcial automática y los nuevos estados de duplicados.**

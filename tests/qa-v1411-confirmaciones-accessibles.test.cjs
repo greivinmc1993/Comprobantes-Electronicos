@@ -32,9 +32,9 @@ test('Regresión E2E comprueba Escape, no ejecución y clasificación intacta',(
  assert.match(bloque,/toBeEnabled\(\)/);
 });
 
-test('Identidad instalador y versión 1.4.13 sincronizadas',()=>{
+test('Identidad instalador y versión sincronizadas con package.json',()=>{
  const paquete=JSON.parse(read('package.json'));
- assert.equal(paquete.version,'1.4.13');
+ assert.match(paquete.version,/^\d+\.\d+\.\d+$/);
  assert.equal(paquete.build.appId,'cr.comprobanteselectronicoscr.desktop');
- assert.match(read('README.md'),/versi%C3%B3n-1\.4\.13-/);
+ assert.ok(read('README.md').includes(`versi%C3%B3n-${paquete.version}-`));
 });

@@ -592,3 +592,87 @@ h1,h2,h3,p {margin-top:0}
 .gastos-comercios-acciones{display:flex;flex-wrap:wrap;gap:10px}
 .gastos-comercios-contenido .gastos-nota{padding:0;margin:0 0 10px}
 @media(max-width:650px){.gastos-comercios-contenido{padding:0 10px 8px}.gastos-comercios-acciones{flex-direction:column}.gastos-comercios-acciones .btn{width:100%;justify-content:center}}
+
+
+/* v1.4.14 - Espaciado consistente exclusivamente en Gastos administrativos.
+   Las tarjetas .surface-card no tienen padding global (algunas contienen tablas
+   a ancho completo), por eso los encabezados de esta pantalla lo necesitan. */
+.gastos-comercios-panel > .section-head,
+.gastos-panel > .section-head {
+  padding:24px 24px 0;
+  margin-bottom:20px;
+  min-width:0;
+}
+.gastos-comercios-panel > .section-head > div,
+.gastos-panel > .section-head > div {min-width:0;max-width:100%;}
+.gastos-comercios-panel > .section-head h2,
+.gastos-panel > .section-head h2 {line-height:1.35;margin-bottom:9px;}
+.gastos-comercios-panel > .section-head p,
+.gastos-panel > .section-head p {line-height:1.65;max-width:780px;overflow-wrap:anywhere;}
+.gastos-comercios-contenido {padding:0 24px 24px;gap:17px;}
+.gastos-comercios-acciones {gap:12px;row-gap:10px;}
+.gastos-comercios-contenido > .gastos-nota {
+  margin:1px 0 0;
+  padding:15px 18px;
+  border:1px solid #e5edf7;
+  border-radius:11px;
+  background:#f8fafd;
+  color:#64748b;
+  line-height:1.75;
+  overflow-wrap:anywhere;
+}
+.gastos-resumen {padding:0 24px 20px;gap:15px;}
+.gastos-resumen > div {padding:18px;}
+.gastos-resumen span {line-height:1.55;}
+.gastos-acciones {padding:0 24px 20px;gap:12px;}
+.gastos-panel > .gastos-nota {
+  margin:0 24px 22px;
+  padding:15px 18px;
+  border:1px solid #e5edf7;
+  border-radius:11px;
+  background:#f8fafd;
+  line-height:1.75;
+  overflow-wrap:anywhere;
+}
+.gastos-panel > .qa-fiscal-warning {margin:0 24px 22px;padding:14px 18px;}
+.gastos-panel > .table-scroll {border-top:1px solid #e6edf5;}
+.gastos-panel .data-table th:first-child,
+.gastos-panel .data-table td:first-child {padding-left:24px;}
+.gastos-panel .data-table th:last-child,
+.gastos-panel .data-table td:last-child {padding-right:24px;}
+.gastos-panel .gastos-vacio {
+  margin:18px 24px 24px;
+  padding:22px 20px;
+  border:1px dashed #d6e2f0;
+  border-radius:11px;
+  background:#f8fafd;
+  color:#64748b;
+  line-height:1.7;
+  overflow-wrap:anywhere;
+}
+@media (max-width:800px) {
+  .gastos-comercios-panel > .section-head,
+  .gastos-panel > .section-head {padding:20px 20px 0;}
+  .gastos-comercios-contenido {padding:0 20px 20px;}
+  .gastos-resumen {padding:0 20px 18px;}
+  .gastos-acciones {padding:0 20px 18px;}
+  .gastos-panel > .gastos-nota {margin:0 20px 20px;}
+  .gastos-panel > .qa-fiscal-warning {margin:0 20px 20px;}
+  .gastos-panel .gastos-vacio {margin:16px 20px 20px;}
+}
+@media (max-width:500px) {
+  .gastos-comercios-panel > .section-head,
+  .gastos-panel > .section-head {padding:18px 16px 0;gap:10px;}
+  .gastos-comercios-contenido {padding:0 16px 18px;gap:14px;}
+  .gastos-comercios-contenido > .gastos-nota {padding:13px 14px;}
+  .gastos-resumen {grid-template-columns:minmax(0,1fr);padding:0 16px 17px;gap:10px;}
+  .gastos-resumen > div {padding:16px;}
+  .gastos-acciones {padding:0 16px 17px;gap:9px;}
+  .gastos-panel > .gastos-nota {margin:0 16px 18px;padding:13px 14px;}
+  .gastos-panel > .qa-fiscal-warning {margin:0 16px 18px;}
+  .gastos-panel .gastos-vacio {margin:14px 16px 18px;padding:18px 16px;}
+  .gastos-panel .data-table th:first-child,
+  .gastos-panel .data-table td:first-child {padding-left:16px;}
+  .gastos-panel .data-table th:last-child,
+  .gastos-panel .data-table td:last-child {padding-right:16px;}
+}

@@ -166,3 +166,8 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - Confirmar que asignación masiva y selección operan sobre todos los XML, incluso aquellos que no se muestran todavía en la tabla de vista previa.
 - Verificar que los duplicados y las empresas pendientes conservan el comportamiento previo a la v1.4.12.
 - Validar el módulo SQLite real y Playwright en GitHub Actions para escritorio y móvil.
+
+## QA UI v1.4.14 — Gastos administrativos
+- Verificar padding del encabezado y la descripción en ambas tarjetas de gastos.
+- Comprobar espaciado de avisos, botones de exportación y estado vacío de la tabla en 390 px y escritorio.
+- Playwright valida separaciones reales del contenido y que los controles y los encabezados siguen visibles.

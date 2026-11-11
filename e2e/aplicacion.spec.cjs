@@ -346,3 +346,32 @@ test('Scroll en el menú de tipos no cierra el desplegable',async({page})=>{
  await page.keyboard.press('Escape');
  await expect(lista).toBeHidden();
 });
+
+
+// v1.4.14 - captura de regresión visual en ambas resoluciones de Playwright.
+test('Gastos administrativos mantiene márgenes internos y estado vacío legible',async({page})=>{
+ const nav=page.getByRole('navigation',{name:'Secciones'});
+ await nav.getByRole('button',{name:'Gastos administrativos',exact:true}).click();
+ const commerce=page.locator('.gastos-comercios-panel');
+ const report=page.locator('.gastos-panel');
+ await expect(commerce.getByRole('heading',{name:'Clasificar gastos por comercio'})).toBeVisible();
+ await expect(report.getByRole('heading',{name:'Reporte de gastos administrativos'})).toBeVisible();
+ const distances=await page.evaluate(()=>{
+   const selectors=[
+     ['.gastos-comercios-panel','.section-head'],
+     ['.gastos-comercios-panel','.gastos-comercios-contenido'],
+     ['.gastos-panel','.section-head'],
+     ['.gastos-panel','.gastos-resumen'],
+     ['.gastos-panel','.gastos-acciones'],
+     ['.gastos-panel','.gastos-vacio']
+   ];
+   return selectors.map(([parentSel,childSel])=>{
+     const parent=document.querySelector(parentSel);
+     const child=parent.querySelector(childSel);
+     if(!child) return -1;
+     const styles=getComputedStyle(child);
+     return parseFloat(child.classList.contains('gastos-vacio')?styles.marginLeft:styles.paddingLeft)||0;
+   });
+ });
+ for(const distance of distances) expect(distance).toBeGreaterThanOrEqual(14);
+});

@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.13-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.14-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -36,6 +36,13 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
+
+## Novedades v1.4.14 — Mejoras visuales en Gastos administrativos
+
+- Encabezados, filtros, botones, notas y mensajes ahora respetan un padding interior uniforme en las tarjetas de **Gastos administrativos**.
+- Mejor separación en el resumen, las exportaciones y el estado vacío de la tabla.
+- Diseño adaptable a ventanas estrechas sin cambiar los cálculos contables ni SQLite.
+- Pruebas automáticas de estilos y escenario de Playwright para escritorio y móvil.
 
 ## Novedades v1.4.13 — Importación sin tandas de diez
 
