@@ -5,8 +5,8 @@ const crypto = require('node:crypto');
 
 const PREFIJO = 'ComprobantesElectronicosCR';
 const FRECUENCIAS = ['inicio', 'diario', 'semanal'];
-const TIPOS = ['automatico', 'manual', 'antes-eliminar', 'antes-recalcular', 'antes-restaurar'];
-const ARCHIVO = new RegExp(`^${PREFIJO}-(automatico|manual|antes-eliminar|antes-recalcular|antes-restaurar)-[0-9TZ_.-]+-[0-9a-f]{8}\\.sqlite$`);
+const TIPOS = ['automatico', 'manual', 'antes-eliminar', 'antes-recalcular', 'antes-restaurar', 'antes-clasificar'];
+const ARCHIVO = new RegExp(`^${PREFIJO}-(automatico|manual|antes-eliminar|antes-recalcular|antes-restaurar|antes-clasificar)-[0-9TZ_.-]+-[0-9a-f]{8}\\.sqlite$`);
 
 function validarConfiguracion(entrada, carpetaAnterior) {
   const habilitado = entrada?.habilitado === true;

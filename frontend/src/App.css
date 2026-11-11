@@ -582,3 +582,13 @@ h1,h2,h3,p {margin-top:0}
 .cupon-confirmacion p { margin:0; font-size:.88rem; color:#21415f; line-height:1.5; }
 .cupon-confirmacion .btn { justify-self:start; max-width:100%; white-space:normal; text-align:left; }
 @media (max-width:580px) { .cupon-confirmacion .btn { width:100%; justify-content:center; } }
+
+/* v1.4.8 - Clasificación de gastos administrativos por comercio */
+.gastos-comercios-panel{margin-bottom:22px;min-width:0}
+.gastos-comercios-contenido{padding:0 16px 8px;display:grid;gap:12px}
+.gastos-comercios-contenido .campo{max-width:680px;min-width:0}
+.gastos-comercios-contenido select{width:100%;min-width:0}
+.gastos-comercios-resumen{display:flex;flex-wrap:wrap;gap:8px 18px;background:#eff6ff;border:1px solid #dbeafe;border-radius:12px;padding:12px;color:#334155;font-size:13px}
+.gastos-comercios-acciones{display:flex;flex-wrap:wrap;gap:10px}
+.gastos-comercios-contenido .gastos-nota{padding:0;margin:0 0 10px}
+@media(max-width:650px){.gastos-comercios-contenido{padding:0 10px 8px}.gastos-comercios-acciones{flex-direction:column}.gastos-comercios-acciones .btn{width:100%;justify-content:center}}

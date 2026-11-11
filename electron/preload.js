@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('comprobantesDesktop',Object.freeze({
   listar:perfilId=>ipcRenderer.invoke('comprobanteselectronicoscr:listar',perfilId),
   marcarGastoAdministrativo:(perfilId,documentoId,habilitado,montoManual)=>ipcRenderer.invoke(
     'comprobanteselectronicoscr:marcar-gasto-administrativo',perfilId,documentoId,habilitado,montoManual),
+  clasificarGastosComercio:(perfilId,clave,habilitado,cantidadEsperada,confirmado)=>ipcRenderer.invoke(
+    'comprobanteselectronicoscr:clasificar-gastos-comercio',perfilId,clave,habilitado,cantidadEsperada,confirmado),
   importar:(perfilId,archivos)=>ipcRenderer.invoke('comprobanteselectronicoscr:importar',perfilId,archivos),
   eliminar:(perfilId,id)=>ipcRenderer.invoke('comprobanteselectronicoscr:eliminar',perfilId,id),
   listarPapelera:()=>ipcRenderer.invoke('comprobanteselectronicoscr:papelera-listar'),

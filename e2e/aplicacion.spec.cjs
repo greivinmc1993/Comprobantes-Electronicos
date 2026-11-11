@@ -28,9 +28,17 @@ test.beforeEach(async({page})=>{
       medioPago:[{tipo:'99',medio:'Cupón',total:10025}]}
   });
   window.__qaGastosGuardados=[];
-  const estado=id=>({perfil:perfiles.find(p=>p.id===id),facturas:id===1?[factura]:[],iva:{'13':id===1?factura.resumen.totalImpuesto:0},base:{'13':id===1?factura.resumen.totalGravado:0},totalNeto:id===1?factura.total:0,documentos:{},errores:[]});
+  const estado=id=>({perfil:perfiles.find(p=>p.id===id),facturas:id===1?[factura]:[],
+   comerciosGastos:id===1?[{clave:'cedula:3101111111',nombre:'Comercio ficticio',cedula:'3101111111',total:1,marcados:factura.gastoAdministrativo?1:0,pendientes:factura.gastoAdministrativo?0:1}]:[],iva:{'13':id===1?factura.resumen.totalImpuesto:0},base:{'13':id===1?factura.resumen.totalGravado:0},totalNeto:id===1?factura.total:0,documentos:{},errores:[]});
   window.comprobantesDesktop={
    listarPerfiles:async()=>({perfiles:[...perfiles]}),listar:async(id)=>estado(id),
+   clasificarGastosComercio:async(perfilId,clave,habilitado,cantidadEsperada,confirmado)=>{
+     if(perfilId!==1||clave!=='cedula:3101111111'||!confirmado||cantidadEsperada!==1) throw new Error('Operación masiva inválida');
+     factura.gastoAdministrativo=habilitado;
+     if(!habilitado) factura.montoGastoManual=null;
+     window.__qaComercioClasificado={perfilId,clave,habilitado,cantidadEsperada};
+     return {afectados:1,totalComercio:1,habilitado,respaldo:'/mock/copia.sqlite'};
+   },
    marcarGastoAdministrativo:async(perfilId,docId,habilitado,montoManual)=>{
      if(perfilId!==1 || docId!==1) throw new Error('No pertenece a la empresa');
      window.__qaGastosGuardados.push({perfilId,docId,habilitado,montoManual});
@@ -235,4 +243,22 @@ test('Cupón sin IVA y total fiscal cero: referencia se registra solo con confir
  await expect(page.locator('.gastos-resumen')).toContainText('₡0,00');
  await page.getByRole('navigation',{name:'Secciones'}).getByRole('button',{name:'Panel general',exact:true}).click();
  await expect(page.locator('.iva-panel')).toContainText('₡0,00');
+});
+
+// v1.4.8 - el comercio se marca por empresa y no modifica el IVA del panel.
+test('Clasificación por comercio marca y desmarca todos sus comprobantes con confirmación',async({page})=>{
+ page.on('dialog',d=>d.accept());
+ const menu=page.getByRole('navigation',{name:'Secciones'});
+ await menu.getByRole('button',{name:'Gastos administrativos'}).click();
+ await expect(page.getByRole('heading',{name:'Clasificar gastos por comercio'})).toBeVisible();
+ await page.getByRole('combobox',{name:'Comercio para gastos administrativos'}).selectOption('cedula:3101111111');
+ await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Sin clasificar: 1');
+ await page.getByRole('button',{name:'Agregar comercio a gastos'}).click();
+ await expect(page.locator('.gastos-resumen')).toContainText('₡100,00');
+ await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Ya clasificados: 1');
+ await page.getByRole('button',{name:'Quitar comercio de gastos'}).click();
+ await expect(page.locator('.gastos-resumen')).toContainText('0');
+ await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Sin clasificar: 1');
+ await menu.getByRole('button',{name:'Panel general'}).click();
+ await expect(page.locator('.iva-panel')).toContainText('₡13,00');
 });

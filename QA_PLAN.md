@@ -132,3 +132,7 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - Unitarias: `tests/qa-v147-flujo-cupon.test.cjs` comprueba que el cupón no se contabiliza sin intervención, el flujo de marcado y la separación de importes.
 - Ejecución requerida: `npm run test:e2e` en GitHub Actions para Chromium de escritorio y móvil; conservar trazas si falla.
 - **No se da por aprobado Playwright hasta ver el resultado del workflow.**
+
+### QA v1.4.8 — Clasificación por comercio
+
+`tests/qa-v148-comercios-gastos.test.cjs` verifica agrupación por cédula, fallback de nombre, aislamiento y reversibilidad. `tests/qa-v148-comercios-sqlite.integration.test.cjs` requiere better-sqlite3 real y prueba transacciones, persistencia, auditoría e importes manuales; corre en la matriz Windows/Linux de GitHub Actions.

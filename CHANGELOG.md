@@ -1,5 +1,17 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.8 — Gastos administrativos por comercio
+
+- Selección de un comercio por cédula fiscal del emisor, con nombre normalizado solo cuando la cédula falta.
+- Resumen de documentos totales, clasificados y pendientes en la empresa activa.
+- Clasificación masiva reversible para todos los documentos activos del emisor (incluye notas de crédito) con confirmación explícita y respaldo SQLite previo.
+- Operación transaccional con control de cantidad esperada, bitácora y aislamiento entre empresas; conserva importes manuales ya registrados al marcar.
+- Si un perfil tiene cédula registrada, se excluyen sus propias ventas de la clasificación masiva de gastos.
+- No cambia los XML, el IVA ni los reportes generales; los documentos con total fiscal cero siguen requiriendo revisión de un importe manual.
+- Pruebas QA automatizadas para agrupación, clasificación, duplicidad de nombres, permisos, transacciones, preservación de importes y registro de auditoría.
+
+# Historial de cambios — ComprobantesElectronicosCR
+
 ## 1.4.7 — Pruebas E2E de gastos y cupones reproducibles
 
 - Preparar los escenarios de XML total cero y cupón en la inicialización de Playwright, antes del montaje de React.

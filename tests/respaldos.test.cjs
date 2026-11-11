@@ -60,3 +60,18 @@ test('Respaldos: cambio de carpeta y retención automática sin borrar copias de
     assert.ok(copias.every(x=>x.ruta.startsWith(nueva+path.sep)));
   }finally{fs.rmSync(carpeta,{recursive:true,force:true});}
 });
+
+
+test('Respaldo antes de clasificar comercio no queda sujeto a retención automática',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'respaldos-comercios-'));
+ try {
+  const gestor=crearGestorRespaldos({
+    configuracionDir:path.join(dir,'config'),carpetaInicial:path.join(dir,'copias'),
+    base:{respaldo:async ruta=>fs.writeFileSync(ruta,'sqlite de prueba')},
+    verificar:()=>{},
+  });
+  await gestor.crear('antes-clasificar');
+  const copias=gestor.estado().copias;
+  assert.equal(copias.filter(x=>x.tipo==='antes-clasificar').length,1);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

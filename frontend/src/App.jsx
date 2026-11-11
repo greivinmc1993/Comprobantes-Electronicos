@@ -178,6 +178,8 @@ export default function App() {
   const [aviso,setAviso]=useState(null);
   const [seleccionado,setSeleccionado]=useState(null);
   const [gastoManualInput,setGastoManualInput]=useState('');
+  const [comercioParaGastos,setComercioParaGastos]=useState('');
+  const [trabajandoComercio,setTrabajandoComercio]=useState(false);
   const [marcados,setMarcados]=useState([]);
   const [marcadosPapelera,setMarcadosPapelera]=useState([]);
   const [papelera,setPapelera]=useState([]);
@@ -267,13 +269,15 @@ export default function App() {
   useEffect(()=>{
     let vivo=true;
     setDatos({facturas:[]});setSeleccionado(null);setPagina(1);
-    setMarcados([]);setDestinoLote('');
+    setMarcados([]);setDestinoLote('');setComercioParaGastos('');
     setTextoBuscar('');setFiltroTipo('TODOS');setFiltroComercio('TODOS');setFiltroIVA('TODOS');setDesde('');setHasta('');
     if(desktop && Number.isSafeInteger(perfilId) && perfilId>0) desktop.listar(perfilId).then(res=>{if(vivo) setDatos(res);}).catch(err=>{if(vivo) mensaje(err.message,'error');});
     return()=>{vivo=false;};
   },[perfilId]);
 
   const todos=datos.facturas||[];
+  const comerciosGastos=datos.comerciosGastos||[];
+  const comercioGastosElegido=comerciosGastos.find(c=>c.clave===comercioParaGastos);
   const filtrados=useMemo(()=>todos.filter(f=>{
     const consulta=textoBuscar.trim().toLocaleLowerCase('es');
     if(consulta && ![f.emisor?.nombre,f.receptor?.nombre,f.nombreArchivo,f.clave,f.consecutivo,f.tipoDocumento,f.comercio]
@@ -534,6 +538,24 @@ export default function App() {
     }catch(error){mensaje(error.message||'No se pudo guardar el gasto','error');}
     finally {setCargando(false);}
   };
+  const clasificarComercio=async habilitado=>{
+    if(!perfilId || !comercioGastosElegido || !desktop?.clasificarGastosComercio)
+      return mensaje('Selecciona un comercio y utiliza la aplicación de escritorio actualizada.','warn');
+    const pendientes=habilitado?comercioGastosElegido.pendientes:comercioGastosElegido.marcados;
+    if(!pendientes)return mensaje('No hay documentos pendientes de esta operación.','warn');
+    const nombre=comercioGastosElegido.nombre;
+    const aviso=habilitado
+      ? `¿Marcar ${pendientes} documento(s) de «${nombre}» como gastos administrativos en «${perfil.nombre}»? Incluye notas de crédito y todos los períodos. Los importes manuales existentes se conservan. Las facturas en cero requieren revisión manual. El IVA del Panel general no cambia.`
+      : `¿Quitar ${pendientes} documento(s) de «${nombre}» de gastos administrativos en «${perfil.nombre}»? También se eliminarán sus importes administrativos manuales, pero no se alterarán los XML ni el IVA.`;
+    if(!window.confirm(aviso))return;
+    setTrabajandoComercio(true);
+    try{
+      const resultado=await desktop.clasificarGastosComercio(perfilId,comercioGastosElegido.clave,habilitado,pendientes,true);
+      await recargar(perfilId);
+      mensaje(`${resultado.afectados} comprobante(s) de «${nombre}» ${habilitado?'agregados a':'retirados de'} gastos administrativos. Respaldo previo creado.`);
+    }catch(error){mensaje(error.message||'No se pudo clasificar el comercio','error');}
+    finally{setTrabajandoComercio(false);}
+  };
   const ejecutarReporteGastos=fn=>{
     if(!gastosFiltrados.cantidad) return mensaje('Marca al menos un comprobante como gasto administrativo.','warn');
     try{fn(perfil,filtrados);mensaje(`Reporte de gastos generado para «${perfil.nombre}».`);}
@@ -703,6 +725,32 @@ export default function App() {
             mostrar={mensaje} actualizar={async()=>{await recargar();await recuperarPerfiles();}}/>}
 
         {seccion==='gastos'&&<>
+          <section className="surface-card gastos-comercios-panel" aria-label="Clasificar gastos por comercio">
+            <div className="section-head"><div><h2>Clasificar gastos por comercio</h2>
+              <p>Marca todos los comprobantes de un emisor en la empresa activa, sin hacerlo factura por factura.</p>
+            </div><span className="chip-neutro">Por empresa</span></div>
+            <div className="gastos-comercios-contenido">
+              <Campo titulo="Selecciona el comercio emisor">
+                <select aria-label="Comercio para gastos administrativos" value={comercioParaGastos}
+                  onChange={e=>setComercioParaGastos(e.target.value)} disabled={trabajandoComercio}>
+                  <option value="">Seleccionar comercio...</option>
+                  {comerciosGastos.map(c=><option key={c.clave} value={c.clave}>{c.nombre}{c.cedula?` · ${c.cedula}`:''} ({c.total})</option>)}
+                </select>
+              </Campo>
+              {comercioGastosElegido&&<div className="gastos-comercios-resumen" role="status">
+                <span>Total: <strong>{comercioGastosElegido.total}</strong></span>
+                <span>Ya clasificados: <strong>{comercioGastosElegido.marcados}</strong></span>
+                <span>Sin clasificar: <strong>{comercioGastosElegido.pendientes}</strong></span>
+              </div>}
+              <div className="gastos-comercios-acciones">
+                <Boton icono="check" disabled={!comercioGastosElegido?.pendientes||trabajandoComercio}
+                  onClick={()=>clasificarComercio(true)}>{trabajandoComercio?'Procesando...':'Agregar comercio a gastos'}</Boton>
+                <Boton clase="btn-light" disabled={!comercioGastosElegido?.marcados||trabajandoComercio}
+                  onClick={()=>clasificarComercio(false)}>Quitar comercio de gastos</Boton>
+              </div>
+              <p className="gastos-nota">Se aplicará a todos los comprobantes activos de este emisor en la empresa elegida, sin importar la página o los filtros de fecha. Incluye notas de crédito para que los gastos netos sean correctos. El XML, los totales fiscales y el IVA no cambian. Se creará un respaldo antes de modificar datos. Las facturas con total cero no reciben automáticamente un importe administrativo manual.</p>
+            </div>
+          </section>
           <section className="surface-card gastos-panel">
             <div className="section-head"><div><h2>Reporte de gastos administrativos</h2>
               <p>Solo comprobantes marcados por ti, dentro de la empresa y el rango de fechas seleccionados.</p>

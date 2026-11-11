@@ -360,3 +360,11 @@ Después de subir el lockfile y verificar la instalación, se recomienda cambiar
 - Solo para documentos clasificados como **gasto administrativo**, se puede pulsar **Registrar importe del cupón como gasto manual** y confirmar después de comprobar el soporte contable.
 - El importe manual afecta exclusivamente al reporte de gastos; el IVA, los totales y los documentos originales no se recalculan.
 - Una referencia de cupón no demuestra gasto efectivamente soportado o deducibilidad fiscal.
+
+### Clasificación de gastos administrativos por comercio (v1.4.8)
+
+En **Gastos administrativos → Clasificar gastos por comercio**, elige primero el perfil de la empresa y luego el comercio emisor. La pantalla muestra cuántos documentos tiene, cuántos ya están clasificados y cuántos faltan. Pulsa **Agregar comercio a gastos** o **Quitar comercio de gastos**; ambas acciones solicitan confirmación y crean una copia SQLite verificada antes del cambio.
+
+La operación incluye todos los documentos activos del emisor dentro de la empresa elegida, independientemente de la fecha o paginación, incluyendo notas de crédito. La agrupación usa preferentemente la cédula del emisor: dos negocios con el mismo nombre pero cédulas distintas no se mezclan. Los documentos sin emisor identificable nunca se marcan en grupo. Si la empresa tiene cédula registrada, sus propios comprobantes emitidos se excluyen de la clasificación masiva de gastos. El historial y los importes manuales ya registrados se conservan al marcar; al quitar se limpia el importe manual, como en la opción individual.
+
+Los documentos con total fiscal cero requieren revisar y registrar manualmente su importe administrativo cuando corresponda. **Ninguna clasificación altera el XML, los totales fiscales, el IVA del Panel general ni constituye reconocimiento fiscal automático del gasto.**

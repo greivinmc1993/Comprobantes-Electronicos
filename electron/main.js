@@ -302,6 +302,18 @@ function registrarPuente() {
     return peticionJSON(`/api/perfiles/${perfilId}/documentos/${documentoId}/gasto-administrativo`,
       'PATCH',{habilitado,montoManual});
   });
+  ipcMain.handle('comprobanteselectronicoscr:clasificar-gastos-comercio',async(e,perfilId,clave,habilitado,cantidadEsperada,confirmado)=>{
+    validarEmisor(e);
+    if (!idValido(perfilId) || confirmado!==true || typeof habilitado!=='boolean')
+      throw new Error('Confirma la clasificación por comercio en la empresa seleccionada');
+    const grupo=base.comerciosGastos(perfilId).find(g=>g.clave===clave);
+    const pendiente=habilitado?grupo?.pendientes:grupo?.marcados;
+    if(!grupo || !Number.isSafeInteger(cantidadEsperada) || cantidadEsperada<1 || pendiente!==cantidadEsperada)
+      throw new Error('La cantidad de comprobantes cambió. Revisa el comercio y confirma nuevamente.');
+    // No modificar cientos de comprobantes sin una copia recuperable y verificada.
+    const copia=await gestorRespaldos.crear('antes-clasificar');
+    return {...base.clasificarGastosPorComercio(perfilId,clave,habilitado,cantidadEsperada),respaldo:copia.ruta};
+  });
   ipcMain.handle('comprobanteselectronicoscr:papelera-listar',async e=>{
     validarEmisor(e);return {documentos:base.listarPapelera()};
   });

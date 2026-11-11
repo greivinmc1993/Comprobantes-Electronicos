@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const {normalizarIdentificacion} = require('./identificaciones');
+const {identidadComercio,agruparGastosComercios} = require('./comercios-gastos');
 
 const LEGACY_PROFILE_NAME = 'Sin asignar (historial anterior)';
 
@@ -560,6 +561,47 @@ function abrirBaseDatos(ruta) {
       return listar.all(perfilId).map(row => ({...JSON.parse(row.datos_json), id:row.id, perfilId: row.perfil_id,
         gastoAdministrativo: row.gasto_administrativo === 1,
         montoGastoManual: row.monto_gasto_manual}));
+    },
+    // Grupos por emisor de la empresa activa; no incluyen documentos de otras empresas ni papelera.
+    comerciosGastos(perfilId) {
+      const perfil=buscarPerfil(perfilId);
+      const docs=listar.all(perfilId).map(row=>({...JSON.parse(row.datos_json),
+        gastoAdministrativo:row.gasto_administrativo===1,montoGastoManual:row.monto_gasto_manual}));
+      // Si la cédula del perfil está registrada, sus propias ventas no son gastos del comercio.
+      return agruparGastosComercios(docs).filter(g=>!perfil.cedula || g.clave!==`cedula:${perfil.cedula}`);
+    },
+    // Operación atómica con confirmación de cantidad: no depende de filtros/paginación del frontend.
+    clasificarGastosPorComercio(perfilId,claveComercio,habilitado,cantidadEsperada) {
+      const perfil=buscarPerfil(perfilId);
+      if(perfil.cedula && claveComercio===`cedula:${perfil.cedula}`)
+        throw new Error('No se pueden clasificar masivamente como gastos las ventas de la empresa activa');
+      if (typeof claveComercio!=='string' || claveComercio.length>220 ||
+          !/^(cedula|nombre):.{1,210}$/.test(claveComercio) || typeof habilitado!=='boolean' ||
+          !Number.isSafeInteger(cantidadEsperada) || cantidadEsperada<1) {
+        throw new Error('Datos de clasificación por comercio inválidos');
+      }
+      return db.transaction(()=>{
+        const filas=listar.all(perfilId);
+        const coincidentes=filas.filter(row=>{
+          const doc=JSON.parse(row.datos_json);
+          return identidadComercio(doc)===claveComercio;
+        });
+        if (!coincidentes.length) throw new Error('El comercio ya no tiene documentos activos en esta empresa');
+        const pendientes=coincidentes.filter(row=>(row.gasto_administrativo===1)!==habilitado);
+        if(pendientes.length!==cantidadEsperada) {
+          throw new Error('Los documentos del comercio cambiaron. Revisa las cantidades antes de confirmar.');
+        }
+        for(const row of pendientes) {
+          // Conservar importes manuales al marcar; al desmarcar se limpian igual que en la acción individual.
+          const manual=habilitado ? row.monto_gasto_manual : null;
+          const modificado=editarClasificacionGasto.run(habilitado?1:0,manual,row.id,perfilId);
+          if(modificado.changes!==1) throw new Error('No se pudo clasificar un comprobante del comercio');
+        }
+        registrar('CLASIFICAR_GASTOS_POR_COMERCIO',perfilId,{
+          claveComercio,habilitado,documentosAfectados:pendientes.length,totalComercio:coincidentes.length
+        });
+        return {afectados:pendientes.length,totalComercio:coincidentes.length,habilitado};
+      })();
     },
     // Preferencia contable independiente del XML y del cómputo general de IVA.
     marcarGastoAdministrativo(perfilId, documentoId, habilitado, montoManual = null) {

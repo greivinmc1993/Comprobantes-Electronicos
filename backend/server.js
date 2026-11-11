@@ -43,7 +43,8 @@ function crearAPI(base, token, rutaFrontend, servicioTipoCambio) {
       }
       for (const tasa of TASAS) bases[tasa] += Number(f.bases?.[tasa]) || 0;
     }
-    return {perfil, iva, base:bases, totalNeto, documentos, facturas, errores:[]};
+    return {perfil, iva, base:bases, totalNeto, documentos, facturas,
+      comerciosGastos:base.comerciosGastos(perfil.id), errores:[]};
   }
 
   api.get('/api/tipo-cambio',async(req,res)=>{
