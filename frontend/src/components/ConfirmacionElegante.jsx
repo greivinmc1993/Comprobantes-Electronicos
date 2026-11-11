@@ -29,7 +29,7 @@ export default function ConfirmacionElegante({datos,onResponder}){
       <div className="modal-head"><div><div className="eyebrow">CONFIRMACIÓN SEGURA</div>
         <h2 id="titulo-confirmacion">{datos.titulo||'Confirmar operación'}</h2>
         <p>Revisa los detalles antes de continuar.</p></div>
-        <button type="button" className="icon-button" aria-label="Cancelar operación" onClick={()=>onResponder(false)}><Icon name="close"/></button></div>
+        <button type="button" className="icon-button" aria-label="Cerrar diálogo de confirmación" onClick={()=>onResponder(false)}><Icon name="close"/></button></div>
       <div className="modal-body"><div className="confirmacion-mensaje"><span className="confirmacion-icono"><Icon name="shield" size={23}/></span>
         <p id="mensaje-confirmacion">{datos.mensaje}</p></div>
         <div className="info-note"><Icon name="info" size={16}/><span>No se realizará ningún cambio hasta que lo confirmes.</span></div></div>

@@ -151,3 +151,10 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - Unidad (`tests/qa-v1410-scroll-desplegables.test.cjs`): diferencia desplazamiento dentro del portal, del selector y de otros paneles; prueba cierre por Escape/clic externo y la contención CSS.
 - Playwright (`e2e/aplicacion.spec.cjs`): abre filtros de Comprobantes, usa rueda del mouse dentro del menú, verifica que el scroll cambie y que siga abierto; comprueba selección y Escape en Chromium escritorio/móvil.
 - Los workflows existentes ejecutan estas pruebas mediante `npm run test:ci` y `npm run test:e2e`.
+
+### Regresión v1.4.11 — Confirmaciones personalizadas
+
+- El botón inferior «Cancelar» tiene nombre accesible **exacto** independiente del botón X «Cerrar diálogo de confirmación».
+- Playwright, en escritorio y móvil: abrir clasificación por comercio y cancelar con «Cancelar», X y Escape. La API de clasificación no debe ejecutarse, el contador pendiente no debe variar y el botón de clasificación debe seguir habilitado.
+- El caso de confirmación positiva sigue comprobando la llamada y la actualización del contador.
+- En CI, el trabajo de Chromium publica trazas, capturas y JUnit si falla un selector o una operación.

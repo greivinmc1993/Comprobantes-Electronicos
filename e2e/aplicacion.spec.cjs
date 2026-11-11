@@ -157,7 +157,7 @@ test('Vista previa muestra advertencia de base IVA multitarifa no atribuida sin 
  const modal=page.getByRole('dialog',{name:'Vista previa de importación XML'});
  await expect(modal.getByRole('note')).toContainText('NO se duplica entre tarifas');
  await expect(modal.getByText('fiscal-sintetico.xml')).toBeVisible();
- await modal.getByRole('button',{name:'Cancelar'}).click();
+ await modal.getByRole('button',{name:'Cancelar',exact:true}).click();
  await expect(modal).toBeHidden();
 });
 
@@ -294,10 +294,32 @@ test('Confirmaciones propias permiten cancelar sin ejecutar operaciones',async({
  await page.getByRole('button',{name:'Agregar comercio a gastos'}).click();
  const confirmacion=page.getByRole('alertdialog',{name:'Clasificar gastos por comercio'});
  await expect(confirmacion).toBeVisible();
- await confirmacion.getByRole('button',{name:'Cancelar'}).click();
+ await confirmacion.getByRole('button',{name:'Cancelar',exact:true}).click();
  await expect(confirmacion).toBeHidden();
  expect(await page.evaluate(()=>window.__qaComercioClasificado??null)).toBeNull();
  await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Sin clasificar: 1');
+});
+
+// v1.4.11: La cancelación tiene tres caminos independientes.
+// Cada uno debe cerrar la ventana SIN llamar al API que modifica SQLite.
+test('La confirmación se cierra sin cambios con X y con Escape',async({page})=>{
+ const menu=page.getByRole('navigation',{name:'Secciones'});
+ await menu.getByRole('button',{name:'Gastos administrativos'}).click();
+ const selector=page.getByRole('combobox',{name:'Comercio para gastos administrativos'});
+ await selector.selectOption('cedula:3101111111');
+ const abrir=page.getByRole('button',{name:'Agregar comercio a gastos'});
+ const confirmacion=page.getByRole('alertdialog',{name:'Clasificar gastos por comercio'});
+ await abrir.click();
+ await expect(confirmacion).toBeVisible();
+ await confirmacion.getByRole('button',{name:'Cerrar diálogo de confirmación',exact:true}).click();
+ await expect(confirmacion).toBeHidden();
+ await abrir.click();
+ await expect(confirmacion).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(confirmacion).toBeHidden();
+ expect(await page.evaluate(()=>window.__qaComercioClasificado??null)).toBeNull();
+ await expect(page.locator('.gastos-comercios-panel').getByRole('status')).toContainText('Sin clasificar: 1');
+ await expect(abrir).toBeEnabled();
 });
 
 // v1.4.10: La rueda del mouse debe desplazar las opciones, no cerrar el popup.

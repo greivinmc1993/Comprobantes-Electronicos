@@ -1,5 +1,12 @@
 # Historial de cambios — ComprobantesElectronicosCR
 
+## 1.4.11 — Accesibilidad de confirmaciones y QA E2E
+
+- Diferenciados los nombres accesibles de los botones «Cancelar» y «Cerrar diálogo de confirmación» para evitar coincidencias ambiguas en Playwright.
+- Localizadores E2E de cancelación con `exact:true` y nueva regresión que prueba X y Escape en escritorio y móvil, verificando que no se realizan cambios.
+- Se conserva íntegra la lógica de confirmación y el control de SQLite, IVA, respaldos y perfiles.
+- La compilación y Playwright completos se validarán en GitHub Actions; la entrega no afirma resultados E2E sin ejecutarlos.
+
 ## 1.4.10 — Desplegables con desplazamiento estable
 
 - Corregido el menú que se cerraba al usar rueda de mouse, trackpad o desplazamiento táctil dentro de la lista de opciones.
@@ -24,8 +31,6 @@
 - Si un perfil tiene cédula registrada, se excluyen sus propias ventas de la clasificación masiva de gastos.
 - No cambia los XML, el IVA ni los reportes generales; los documentos con total fiscal cero siguen requiriendo revisión de un importe manual.
 - Pruebas QA automatizadas para agrupación, clasificación, duplicidad de nombres, permisos, transacciones, preservación de importes y registro de auditoría.
-
-# Historial de cambios — ComprobantesElectronicosCR
 
 ## 1.4.7 — Pruebas E2E de gastos y cupones reproducibles
 
