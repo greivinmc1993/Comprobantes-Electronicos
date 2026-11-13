@@ -14,14 +14,14 @@ const masivaURL=pathToFileURL(path.join(raiz,'frontend/src/components/asignacion
 test('vista previa apila los XML sin mínimo horizontal en móvil',()=>{
  assert.match(css,/@media\s*\(max-width:\s*620px\)/);
  assert.match(css,/\.qa-preview \.qa-table\s*,\s*\.qa-preview \.qa-table tbody\s*\{[^}]*min-width:0/s);
- assert.match(css,/\.qa-preview \.qa-table-scroll\s*\{[^}]*overflow-x:hidden/s);
+ assert.match(css,/\.qa-preview \.qa-table-scroll\s*\{[^}]*overflow:clip/s);
  assert.match(css,/\.qa-preview \.qa-table tbody tr\s*\{[^}]*display:grid/s);
  assert.match(css,/\.qa-preview \.qa-table tbody td:nth-child\(4\)::before\s*\{content:'Empresa destino'\}/);
 });
 
-test('filtrar pendientes solo reinicia el scroll interno sin desplazar el diálogo',()=>{
+test('filtrar pendientes reinicia el scroll del cuerpo y no depende de scrollIntoView',()=>{
  assert.match(vista,/const cambiarFiltro=\(nuevo\)=>\{/);
- assert.match(vista,/if\(tablaRef\.current\) tablaRef\.current\.scrollTop=0/);
+ assert.match(vista,/if\(cuerpoRef\.current\) cuerpoRef\.current\.scrollTop=0/);
  assert.doesNotMatch(vista,/tablaRef\.current\.scrollIntoView\??\(/);
 });
 

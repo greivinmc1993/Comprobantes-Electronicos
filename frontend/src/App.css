@@ -738,8 +738,10 @@ h1,h2,h3,p {margin-top:0}
   .qa-preview .modal-footer {padding:12px 13px;gap:8px;flex-wrap:wrap}
   .qa-preview .modal-footer .btn {flex:1 1 138px;min-width:0;white-space:normal}
   .qa-preview .qa-table-scroll {
-    max-height:46dvh;min-width:0;width:100%;overflow-x:hidden;overflow-y:auto;
-    overscroll-behavior:contain;margin:9px 0;
+    /* One scroll container: modal-body. Nested vertical scroll previously placed
+       mobile checkboxes under the parent and blocked real pointer events. */
+    flex:0 0 auto;max-height:none;min-width:0;width:100%;
+    overflow:clip; margin:9px 0;
   }
   .qa-preview .qa-table,
   .qa-preview .qa-table tbody {display:block;width:100%;min-width:0;max-width:100%}
@@ -777,8 +779,11 @@ h1,h2,h3,p {margin-top:0}
 
 /* v1.4.17 — Controles de revisión móviles: clics estables dentro del scroll. */
 @media (max-width: 620px) {
-  .qa-preview .modal-body.qa-preview-body {overscroll-behavior:contain;scrollbar-gutter:stable;}
-  .qa-preview .qa-table-scroll {overscroll-behavior:contain;scrollbar-gutter:stable;}
+  .qa-preview .modal-body.qa-preview-body {
+    overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+    scrollbar-gutter:stable;scroll-padding-top:16px;
+  }
+  .qa-preview .qa-table-scroll {scrollbar-gutter:auto;}
   .qa-preview .qa-table tbody tr {position:relative;}
   .qa-preview .qa-table tbody td:nth-child(1) input[type="checkbox"] {
     min-width:20px;min-height:20px;touch-action:manipulation;

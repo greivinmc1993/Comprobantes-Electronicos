@@ -1,4 +1,4 @@
-# Plan de QA — ComprobantesElectronicosCR v1.4.17
+# Plan de QA — ComprobantesElectronicosCR v1.4.18
 
 ## Alcance y prioridades
 
@@ -195,3 +195,11 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 Las pruebas `Importación masiva` y `Vista previa: filtrar pendientes y errores` usan `test.step()` para separar preparación, marcado, selección de empresa, aplicación y confirmación. En cada fase se verifica el estado antes de continuar. Si falla en Actions, abrir los artefactos `playwright-report` y `test-results` (traza y captura) para identificar el paso exacto; el resultado resumido `2 failed` no permite identificarlo.
 
 Los XML `requiere_empresa` deben comenzar desmarcados, y los `error` no deben admitirse. La asignación por cédula y el comportamiento de duplicados **no se han modificado**.
+
+## QA v1.4.18 — Intercepción de toques en móvil
+
+- Validar que `.qa-preview-body` sea el único contenedor de scroll vertical a 390 px de ancho.
+- Asegurar que `.qa-table-scroll` no tenga un segundo scroll anidado en esa resolución.
+- Filtrar un XML «Por revisar», escoger empresa, marcarlo con una acción Playwright `check()` real y conservar la selección al cambiar de filtro.
+- Repetir con una fila situada al final de 24 XML sintéticos. No utilizar `force:true`, cambios directos al DOM ni tiempos artificiales.
+- Ejecutar ambos proyectos de Playwright en GitHub Actions y revisar capturas/trazas si algo falla.

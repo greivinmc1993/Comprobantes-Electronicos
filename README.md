@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.17-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.18-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -36,6 +36,13 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
+
+## Novedades v1.4.18 — Corrección real del toque en importación móvil
+
+- Un solo contenedor desplaza el contenido del diálogo de vista previa en móvil; la lista de tarjetas ya no compite con él por el scroll.
+- Casillas y selectores al final de lotes grandes siguen accesibles mediante toques reales; sin `force: true` ni manipulación directa del estado en Playwright.
+- Las pruebas E2E comprueban los filtros, la asignación y la selección al final de listas de XML en Chromium móvil.
+- No hay cambios en SQLite, IVA, duplicados, empresas o reglas fiscales. Se conserva el instalador independiente de FacturaCR.
 
 ## Novedades v1.4.17 — Vista previa móvil y estabilidad de Playwright
 

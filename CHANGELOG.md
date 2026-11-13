@@ -1,3 +1,10 @@
+## v1.4.18 — Un solo scroll en vista previa móvil
+
+- Corregida la interceptación de toques sobre casillas de XML en la vista previa con múltiples tarjetas.
+- El cuerpo del diálogo es el único contenedor de scroll vertical en móvil; se elimina el scroll interno de la tabla.
+- Pruebas E2E de pulsación real sobre un documento al final de un lote grande, filtro y conservación de la selección.
+- Se mantienen las validaciones fiscales, la selección segura y la identidad del instalador.
+
 ## v1.4.17 — Estabilidad de la vista previa móvil y diagnóstico QA
 
 - Cada nueva vista previa inicializa selección y destinos antes del primer render, evitando carreras con efectos de React.

@@ -135,7 +135,8 @@ test('Importación masiva: asignar dos XML a una empresa con una sola acción',a
   await expect(modal.getByRole('button',{name:'Ver 2 XML por revisar'})).toBeVisible();
   if(page.viewportSize().width<=620){
    await expect(modal.locator('.qa-table')).toHaveCSS('min-width','0px');
-   await expect(modal.getByTestId('qa-lista-xml')).toHaveCSS('overflow-x','hidden');
+   await expect(modal.getByTestId('qa-lista-xml')).toHaveCSS('overflow-x','clip');
+   await expect(modal.getByTestId('qa-lista-xml')).toHaveCSS('overflow-y','clip');
   }
   await expect(modal.getByTestId('qa-fila-0').getByRole('checkbox',{name:'Incluir ficticio-a.xml'})).not.toBeChecked();
   await expect(modal.getByTestId('qa-fila-1').getByRole('checkbox',{name:'Incluir ficticio-b.xml'})).not.toBeChecked();
@@ -228,7 +229,8 @@ test('Vista previa móvil: empresa y revisión accesibles sin desplazamiento hor
  const dlg=page.getByRole('dialog',{name:'Vista previa de importación XML'});
  await expect(dlg).toBeVisible();
  const tabla=dlg.locator('.qa-table-scroll');
- await expect(tabla).toHaveCSS('overflow-x','hidden');
+ await expect(tabla).toHaveCSS('overflow-x','clip');
+ await expect(tabla).toHaveCSS('overflow-y','clip');
  const dimensiones=await tabla.evaluate(el=>({visible:el.clientWidth,real:el.scrollWidth}));
  expect(dimensiones.real).toBeLessThanOrEqual(dimensiones.visible+2);
  const checkbox=dlg.getByRole('checkbox',{name:'Incluir pendiente-movil.xml'});
@@ -239,6 +241,39 @@ test('Vista previa móvil: empresa y revisión accesibles sin desplazamiento hor
  await expect(checkbox).not.toBeChecked();
  await checkbox.check();
  await expect(dlg.getByRole('button',{name:'Confirmar 1 XML'})).toBeEnabled();
+});
+
+// v1.4.18 — regresión real de eventos táctiles: un control al final de la lista
+// no puede quedar bajo el scroll interior o bajo el encabezado de la ventana.
+test('Vista previa móvil: marcar XML al final de una lista larga sin interceptación de clics',async({page})=>{
+ test.skip(page.viewportSize().width>620,'Solo aplica al diseño móvil');
+ await page.evaluate(()=>{
+  const filas=Array.from({length:24},(_,indice)=>({
+   indice,archivo:`qa-lista-${indice}.xml`,estado:indice===23?'requiere_empresa':'listo',
+   empresaSugerida:indice===23?null:1,empresasCompatibles:[],sinCedula:[1,2],
+   total:100+indice,moneda:'CRC',tipo:'Factura electrónica'
+  }));
+  window.comprobantesDesktop.previsualizar=async()=>({token:'qa-scroll-unico',filas});
+ });
+ await page.getByRole('button',{name:'Importación inteligente'}).click();
+ await page.locator('input[type=file]').first().setInputFiles({
+  name:'lote-grande.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')
+ });
+ const dialogo=page.getByRole('dialog',{name:'Vista previa de importación XML'});
+ const tabla=dialogo.getByTestId('qa-lista-xml');
+ await expect(tabla).toHaveCSS('overflow-y','clip');
+ await expect(dialogo.locator('.qa-preview-body')).toHaveCSS('overflow-y','auto');
+ // Filtrar localiza la última fila incluso si está tras decenas de comprobantes.
+ await dialogo.getByRole('button',{name:'Ver 1 XML por revisar'}).click();
+ const ultimo=dialogo.getByTestId('qa-fila-23');
+ const destino=ultimo.getByLabel('Empresa destino para qa-lista-23.xml');
+ await destino.selectOption('1');
+ const checkbox=ultimo.getByRole('checkbox',{name:'Incluir qa-lista-23.xml'});
+ await expect(checkbox).not.toBeChecked();
+ await checkbox.check(); // NO force:true, NO evaluate() para cambiar la casilla
+ await expect(checkbox).toBeChecked();
+ await dialogo.getByRole('button',{name:/Todos 24/}).click();
+ await expect(ultimo.getByRole('checkbox',{name:'Incluir qa-lista-23.xml'})).toBeChecked();
 });
 
 test('Vista previa muestra advertencia de base IVA multitarifa no atribuida sin guardar',async({page})=>{
