@@ -676,3 +676,49 @@ h1,h2,h3,p {margin-top:0}
   .gastos-panel .data-table th:last-child,
   .gastos-panel .data-table td:last-child {padding-right:16px;}
 }
+
+/* v1.4.15 · Acceso rápido a los XML pendientes, sin selección involuntaria */
+.qa-summary>button.qa-summary-link {
+  appearance:none;cursor:pointer;padding:7px 12px;
+  border:1px solid #f3d4a1;border-radius:20px;background:#fff6e8;
+  color:#87541d;font-size:11px;font-weight:650;line-height:1.4;
+  transition:background .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.qa-summary>button.qa-summary-link strong {font-size:13px;color:#92540f}
+.qa-summary>button.qa-summary-link:hover:not(:disabled) {background:#ffedcf;border-color:#e5b871}
+.qa-summary>button.qa-summary-link:focus-visible,.qa-review-filter:focus-visible {
+  outline:3px solid #78adf7;outline-offset:2px
+}
+.qa-summary>button.qa-summary-link:disabled {opacity:.5;cursor:not-allowed}
+.qa-review-tools {
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+  padding:12px 14px;border:1px solid #dce7f5;border-radius:12px;
+  background:#f8fbff;margin:3px 0 0;
+}
+.qa-review-title {font-weight:850;font-size:11px;color:#314b70;margin-right:3px}
+.qa-review-filter {
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 12px;background:#fff;color:#355372;
+  border:1px solid #cfdcf0;border-radius:9px;
+  font-size:11px;font-weight:750;cursor:pointer;
+  transition:background .15s ease,border-color .15s ease,box-shadow .15s ease;
+}
+.qa-review-filter strong {font-variant-numeric:tabular-nums;font-size:11px;color:inherit}
+.qa-review-filter-warning:not(.qa-review-filter-active) {color:#9a5d16;border-color:#f2d8aa;background:#fffaf0}
+.qa-review-filter:hover:not(:disabled) {background:#eaf2ff;border-color:#9abbe9}
+.qa-review-filter-active,.qa-review-filter-active:hover:not(:disabled) {
+  background:#255fbd;border-color:#255fbd;color:#fff;
+  box-shadow:0 2px 6px #1e58a51e;
+}
+.qa-review-filter:disabled {opacity:.55;cursor:not-allowed}
+.qa-review-help {flex:1 1 250px;text-align:right;color:#607b99;font-size:10.5px;line-height:1.5}
+.qa-review-empty {text-align:center!important;color:#59738f!important;padding:30px 18px!important}
+.qa-preview .qa-table-scroll {scroll-margin-top:10px}
+@media(max-width:780px) {
+  .qa-review-tools {padding:11px;gap:7px}
+  .qa-review-title {width:100%}
+  .qa-review-help {flex-basis:100%;text-align:left}
+}
+@media(max-width:420px) {
+  .qa-review-filter {padding:7px 9px}
+}

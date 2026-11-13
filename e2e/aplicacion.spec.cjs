@@ -132,6 +132,11 @@ test('Importación masiva: asignar dos XML a una empresa con una sola acción',a
  const modal=page.getByRole('dialog',{name:'Vista previa de importación XML'});
  await expect(modal).toBeVisible();
  await expect(modal.getByText('2', {exact:true}).first()).toBeVisible();
+ // Los XML sin empresa sugerida no se seleccionan hasta que el usuario los autoriza.
+ await expect(modal.getByRole('checkbox',{name:'Incluir ficticio-a.xml'})).not.toBeChecked();
+ await expect(modal.getByRole('checkbox',{name:'Incluir ficticio-b.xml'})).not.toBeChecked();
+ await modal.getByRole('checkbox',{name:'Incluir ficticio-a.xml'}).check();
+ await modal.getByRole('checkbox',{name:'Incluir ficticio-b.xml'}).check();
  await modal.getByLabel('Empresa para asignación masiva').selectOption('2');
  await modal.getByRole('button',{name:/Asignar a 2 XML/}).click();
  await expect(modal.getByRole('status')).toContainText('2 XML asignados');
@@ -140,6 +145,42 @@ test('Importación masiva: asignar dos XML a una empresa con una sola acción',a
  const importacion=await page.evaluate(()=>window.__qaImportacionMasiva);
  expect(importacion.token).toBe('lote-masivo-qa');
  expect(importacion.selecciones).toEqual([{indice:0,perfilId:2},{indice:1,perfilId:2}]);
+});
+
+
+// v1.4.15: un XML sin empresa no debe colarse en «Marcar listos».
+test('Vista previa: filtrar pendientes y errores sin marcar XML por revisar',async({page})=>{
+ await page.evaluate(()=>{
+   window.comprobantesDesktop.previsualizar=async()=>({token:'qa-v1415',filas:[
+     {indice:0,archivo:'qa-listo.xml',estado:'listo',empresaSugerida:1,empresasCompatibles:[],total:113,moneda:'CRC'},
+     {indice:1,archivo:'qa-pendiente.xml',estado:'requiere_empresa',empresaSugerida:null,empresasCompatibles:[],total:88,moneda:'CRC'},
+     {indice:2,archivo:'qa-error.xml',estado:'error',error:'XML inválido'},
+   ]});
+ });
+ await page.getByRole('button',{name:'Importación inteligente'}).click();
+ await page.locator('input[type=file]').first().setInputFiles({name:'archivo.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')});
+ const modal=page.getByRole('dialog',{name:'Vista previa de importación XML'});
+ const listo=modal.getByRole('checkbox',{name:'Incluir qa-listo.xml'});
+ const pendiente=modal.getByRole('checkbox',{name:'Incluir qa-pendiente.xml'});
+ const error=modal.getByRole('checkbox',{name:'Incluir qa-error.xml'});
+ await expect(listo).toBeChecked();
+ await expect(pendiente).not.toBeChecked();
+ await expect(error).toBeDisabled();
+ await modal.getByRole('button',{name:'Marcar listos'}).click();
+ await expect(pendiente).not.toBeChecked();
+ await modal.getByRole('button',{name:'Ver 1 XML por revisar'}).click();
+ await expect(modal.getByText('qa-pendiente.xml')).toBeVisible();
+ await expect(modal.getByText('qa-listo.xml')).toHaveCount(0);
+ // La empresa se puede elegir aunque el documento pendiente siga desmarcado.
+ await modal.getByLabel('Empresa destino para qa-pendiente.xml').selectOption('1');
+ await expect(pendiente).not.toBeChecked();
+ await pendiente.check();
+ await modal.getByRole('button',{name:'Ver 1 XML con error'}).click();
+ await expect(modal.getByText('qa-error.xml')).toBeVisible();
+ await expect(modal.getByText('qa-pendiente.xml')).toHaveCount(0);
+ await modal.getByRole('button',{name:/Todos 3/}).click();
+ await expect(pendiente).toBeChecked();
+ await expect(modal.getByRole('button',{name:'Confirmar 2 XML'})).toBeEnabled();
 });
 
 test('Vista previa muestra advertencia de base IVA multitarifa no atribuida sin guardar',async({page})=>{

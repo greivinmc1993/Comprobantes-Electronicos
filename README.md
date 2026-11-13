@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.14-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.15-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -36,6 +36,14 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
+
+## Novedades v1.4.15 — Revisión rápida durante la importación
+
+- Filtros rápidos **Todos**, **Listos**, **Por revisar**, **Con errores** y **Duplicados en lote** para localizar XML en cualquier parte de un lote (también después de los primeros 200).
+- Los documentos que requieren revisión empiezan **desmarcados**. «Marcar listos» no los incluye ni selecciona errores o duplicados.
+- Los contadores «Por revisar» y «Con error» permiten abrir directamente la categoría y sus detalles.
+- El usuario puede asignar empresa a un XML pendiente sin marcarlo automáticamente, y después incluirlo expresamente.
+- Se conserva la lógica original de detección de duplicados e importación de la versión 1.4.14, sin cambios en SQLite.
 
 ## Novedades v1.4.14 — Mejoras visuales en Gastos administrativos
 

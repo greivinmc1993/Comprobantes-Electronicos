@@ -1,3 +1,11 @@
+## 1.4.15 — Revisión rápida de importaciones
+
+- Filtros de resultados por estado: todos, listos, por revisar, errores y duplicados del lote.
+- Acceso directo desde contadores de XML pendientes/con errores; filtrado antes del límite de 200 filas visibles.
+- XML que requieren revisión desmarcados al abrir; la selección global solo incluye los listos.
+- Selección manual y asignación de empresa disponibles para cada XML pendiente, sin aprobarlo automáticamente.
+- Pruebas unitarias y escenarios de Playwright para los nuevos controles. Sin cambios en SQLite o impuestos.
+
 # Historial de cambios — ComprobantesElectronicosCR
 
 ## 1.4.14 — Espaciado de Gastos administrativos

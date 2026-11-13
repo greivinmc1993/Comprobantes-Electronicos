@@ -171,3 +171,13 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - Verificar padding del encabezado y la descripción en ambas tarjetas de gastos.
 - Comprobar espaciado de avisos, botones de exportación y estado vacío de la tabla en 390 px y escritorio.
 - Playwright valida separaciones reales del contenido y que los controles y los encabezados siguen visibles.
+
+
+## QA v1.4.15 — Revisión y selección segura de XML
+
+- Comprobar que una vista con múltiples empresas tenga «Por revisar» desmarcados por defecto.
+- «Marcar listos» no debe marcar documentos pendientes, duplicados ni con error; «Desmarcar» elimina todas las selecciones.
+- Filtrar por «Por revisar» y «Con errores» incluso si las filas están después de la posición 200.
+- Revisar XML pendientes: elegir empresa compatible, marcarlo manualmente y confirmar únicamente los elegidos.
+- Los contadores de revisión son accesos directos; cambios de filtros no alteran la selección del lote.
+- Ejecutar la suite Node y Playwright en GitHub Actions (Chromium escritorio y móvil).

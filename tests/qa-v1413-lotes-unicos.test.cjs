@@ -74,10 +74,10 @@ test('Los controles UI revisan todos los comprobantes aunque muestre solo 200 fi
   const ui=read('frontend/src/components/VistaPrevia.jsx');
   assert.match(app,/await prepararVista\(files\)/);
   assert.doesNotMatch(app,/files\.slice\(0,10\)|colaPendiente|setColaPendiente/);
-  assert.match(ui,/filas\.slice\(0,limiteVisibles\)/);
+  assert.match(ui,/filasFiltradas\.slice\(0,limiteVisibles\)/);
   assert.match(ui,/const elegidos=aplicables\.filter/);
   assert.match(ui,/onConfirmar\(validos\.map/);
-  assert.match(ui,/setLimiteVisibles\(n=>Math\.min\(n\+200,filas\.length\)\)/);
+  assert.match(ui,/setLimiteVisibles\(n=>Math\.min\(n\+200,filasFiltradas\.length\)\)/);
 });
 
 test('El límite por lote está coherente en SQLite, Electron y API',()=>{
