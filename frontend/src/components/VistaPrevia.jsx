@@ -24,7 +24,14 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
   const listos=filas.filter(esListo);
   const porRevisar=filas.filter(necesitaRevision).length;
   const duplicados=filas.filter(esDuplicadoEnLote).length;
-  const cambiarFiltro=(nuevo)=>{setFiltro(nuevo);setLimiteVisibles(200);if(tablaRef.current){tablaRef.current.scrollTop=0;tablaRef.current.scrollIntoView?.({block:'nearest'});}};
+  const cambiarFiltro=(nuevo)=>{
+    setFiltro(nuevo);
+    setLimiteVisibles(200);
+    // Volver al inicio de la tabla, sin desplazar el diálogo completo.
+    // scrollIntoView sobre una tabla dentro de un modal cambiaba el scroll
+    // del contenedor exterior, sobre todo con el viewport móvil de Playwright.
+    if(tablaRef.current) tablaRef.current.scrollTop=0;
+  };
   const aplicables=filas.filter(f=>!['error','duplicado_en_lote'].includes(f.estado));
   const elegidos=aplicables.filter(f=>!excluidos[f.indice]);
   const validos=elegidos.filter(f=>{
@@ -46,7 +53,7 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
   };
   const marcarTodos=(checked)=>setExcluidos(prev=>marcarComprobantes(filas,prev,checked));
   const confirmar=()=>onConfirmar(validos.map(f=>({indice:f.indice,perfilId:Number(selecciones[f.indice])})));
-  return <div className="overlay modal-overlay" role="presentation"><section className="company-modal qa-preview" role="dialog" aria-modal="true" aria-label="Vista previa de importación XML">
+  return <div className="overlay modal-overlay qa-preview-overlay" role="presentation"><section className="company-modal qa-preview" role="dialog" aria-modal="true" aria-label="Vista previa de importación XML">
     <div className="modal-head"><div><div className="eyebrow">IMPORTACIÓN INTELIGENTE · XML 4.4</div><h2>Revisa antes de guardar</h2><p>Asigna una empresa a varios XML a la vez. No se guardará nada hasta confirmar.</p></div><button type="button" className="icon-button" disabled={cargando} onClick={onCerrar} aria-label="Cerrar vista previa"><Icon name="close"/></button></div>
     <div className="modal-body qa-preview-body">
       <div className="info-note"><Icon name="shield"/><span>Los documentos con cédula coincidente se asignan automáticamente. La asignación masiva no cambia XML con cédulas incompatibles. Antes de guardar, revisa la empresa elegida.</span></div>

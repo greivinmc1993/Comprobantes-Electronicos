@@ -8,7 +8,7 @@
 
 Importa XML, organiza los documentos de varias empresas, consulta totales en colones y genera reportes. Una aplicación de escritorio para Windows con historial SQLite, respaldos y pruebas automatizadas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.15-2563EB?style=flat-square)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.16-2563EB?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-64%20bits-0F766E?style=flat-square)
 ![XML](https://img.shields.io/badge/XML-Hacienda%204.4-64748B?style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-sin%20definir-64748B?style=flat-square)
@@ -36,6 +36,14 @@ Importa XML, organiza los documentos de varias empresas, consulta totales en col
 - **Respaldos:** SQLite con frecuencia configurable, validación de integridad, retención de copias automáticas y respaldo anterior a operaciones delicadas.
 - **Seguridad local:** API escuchando en `127.0.0.1`, token interno para sus rutas, puente limitado entre React y Electron y almacenamiento sin servicios externos de cuentas.
 
+
+## Novedades v1.4.16 — Vista previa móvil y estabilidad de Playwright
+
+- Revisión XML adaptable: en pantallas de hasta 620 px las filas se presentan como tarjetas, sin una tabla horizontal de 800 px.
+- La selección de empresa, el checkbox y el motivo de revisión permanecen visibles en cada tarjeta.
+- Al cambiar el filtro, solo se reinicia el scroll interno de la lista; no se fuerza el desplazamiento del modal completo.
+- Se refuerzan las pruebas E2E de asignación masiva, filtros por estado y visualización móvil.
+- Los documentos por revisar continúan desmarcados por defecto; la validación fiscal, los duplicados y SQLite no cambian.
 
 ## Novedades v1.4.15 — Revisión rápida durante la importación
 

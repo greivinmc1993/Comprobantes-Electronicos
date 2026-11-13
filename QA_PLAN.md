@@ -181,3 +181,11 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - Revisar XML pendientes: elegir empresa compatible, marcarlo manualmente y confirmar únicamente los elegidos.
 - Los contadores de revisión son accesos directos; cambios de filtros no alteran la selección del lote.
 - Ejecutar la suite Node y Playwright en GitHub Actions (Chromium escritorio y móvil).
+
+## QA v1.4.16 — Revisión XML móvil
+
+- En Chromium móvil, comprobar que los controles de una fila (casilla, empresa y observación) están disponibles sin desplazamiento horizontal.
+- En escritorio y móvil, un XML por revisar se inicia desmarcado y no se activa con «Marcar listos».
+- Filtrar por estado nunca debe desplazar toda la ventana de revisión ni modificar las selecciones.
+- Asignar empresa a dos XML seleccionados conserva la validación individual y requiere confirmación.
+- Los resultados finales de Playwright se comprueban en GitHub Actions; la prueba no se considera superada hasta ejecutar Chromium con las dependencias instaladas.

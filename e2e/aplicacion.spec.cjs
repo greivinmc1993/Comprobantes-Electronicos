@@ -131,7 +131,11 @@ test('Importación masiva: asignar dos XML a una empresa con una sola acción',a
  await page.locator('input[type=file]').first().setInputFiles({name:'lote.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')});
  const modal=page.getByRole('dialog',{name:'Vista previa de importación XML'});
  await expect(modal).toBeVisible();
- await expect(modal.getByText('2', {exact:true}).first()).toBeVisible();
+ await expect(modal.getByRole('button',{name:'Ver 2 XML por revisar'})).toBeVisible();
+ if(page.viewportSize().width<=620){
+   await expect(modal.locator('.qa-table')).toHaveCSS('min-width','0px');
+   await expect(modal.locator('.qa-table-scroll')).toHaveCSS('overflow-x','hidden');
+ }
  // Los XML sin empresa sugerida no se seleccionan hasta que el usuario los autoriza.
  await expect(modal.getByRole('checkbox',{name:'Incluir ficticio-a.xml'})).not.toBeChecked();
  await expect(modal.getByRole('checkbox',{name:'Incluir ficticio-b.xml'})).not.toBeChecked();
@@ -172,7 +176,10 @@ test('Vista previa: filtrar pendientes y errores sin marcar XML por revisar',asy
  await expect(modal.getByText('qa-pendiente.xml')).toBeVisible();
  await expect(modal.getByText('qa-listo.xml')).toHaveCount(0);
  // La empresa se puede elegir aunque el documento pendiente siga desmarcado.
- await modal.getByLabel('Empresa destino para qa-pendiente.xml').selectOption('1');
+ const destino=modal.getByLabel('Empresa destino para qa-pendiente.xml');
+ await expect(destino).toBeVisible();
+ await destino.selectOption('1');
+ await expect(destino).toHaveValue('1');
  await expect(pendiente).not.toBeChecked();
  await pendiente.check();
  await modal.getByRole('button',{name:'Ver 1 XML con error'}).click();
@@ -181,6 +188,34 @@ test('Vista previa: filtrar pendientes y errores sin marcar XML por revisar',asy
  await modal.getByRole('button',{name:/Todos 3/}).click();
  await expect(pendiente).toBeChecked();
  await expect(modal.getByRole('button',{name:'Confirmar 2 XML'})).toBeEnabled();
+});
+
+
+// Regresión responsive: el destino de un XML pendiente se muestra sin scroll horizontal.
+test('Vista previa móvil: empresa y revisión accesibles sin desplazamiento horizontal',async({page})=>{
+ test.skip(page.viewportSize().width>620,'Solo aplica al diseño móvil');
+ await page.evaluate(()=>{
+   window.comprobantesDesktop.previsualizar=async()=>({token:'qa-mobile-card',filas:[
+     {indice:0,archivo:'pendiente-movil.xml',estado:'requiere_empresa',empresaSugerida:null,
+      empresasCompatibles:[],sinCedula:[1,2],total:90,moneda:'CRC'}
+   ]});
+ });
+ await page.getByRole('button',{name:'Importación inteligente'}).click();
+ await page.locator('input[type=file]').first().setInputFiles({name:'pendiente.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')});
+ const dlg=page.getByRole('dialog',{name:'Vista previa de importación XML'});
+ await expect(dlg).toBeVisible();
+ const tabla=dlg.locator('.qa-table-scroll');
+ await expect(tabla).toHaveCSS('overflow-x','hidden');
+ const dimensiones=await tabla.evaluate(el=>({visible:el.clientWidth,real:el.scrollWidth}));
+ expect(dimensiones.real).toBeLessThanOrEqual(dimensiones.visible+2);
+ const checkbox=dlg.getByRole('checkbox',{name:'Incluir pendiente-movil.xml'});
+ await expect(checkbox).not.toBeChecked();
+ const destino=dlg.getByLabel('Empresa destino para pendiente-movil.xml');
+ await destino.selectOption('2');
+ await expect(destino).toHaveValue('2');
+ await expect(checkbox).not.toBeChecked();
+ await checkbox.check();
+ await expect(dlg.getByRole('button',{name:'Confirmar 1 XML'})).toBeEnabled();
 });
 
 test('Vista previa muestra advertencia de base IVA multitarifa no atribuida sin guardar',async({page})=>{

@@ -1,3 +1,10 @@
+## 1.4.16 — Vista previa adaptable y QA móvil
+
+- La revisión de XML usa tarjetas responsivas en móviles y deja accesible la selección de empresa sin scroll horizontal.
+- Los filtros no desplazan forzosamente el modal completo; se conserva la posición del usuario.
+- Nuevas verificaciones de Playwright para selección segura, filtro por estados y ancho móvil.
+- Sin cambios en cálculos fiscales, SQLite, importación ni identidad del instalador.
+
 ## 1.4.15 — Revisión rápida de importaciones
 
 - Filtros de resultados por estado: todos, listos, por revisar, errores y duplicados del lote.
