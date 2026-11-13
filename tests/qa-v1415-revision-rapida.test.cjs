@@ -56,7 +56,8 @@ test('La interfaz ofrece accesos rápidos y selección manual sin ocultar el ele
  assert.match(jsx,/aria-label=\{`Ver \$\{errores\} XML con error`\}/);
  assert.match(jsx,/filtrarPorRevision\(filas,filtro\)/);
  assert.match(jsx,/filasFiltradas\.slice\(0,limiteVisibles\)/);
- assert.match(jsx,/setExcluidos\(exclusionInicial\(vista\?\.filas\|\|\[\]\)\)/);
+ // Inicialización sin esperar a useEffect: la vista previa se monta por token.
+ assert.match(jsx,/useState\(\(\)=>exclusionInicial\(vista\?\.filas\|\|\[\]\)\)/);
  assert.match(jsx,/disabled=\{cargando\|\|f\.estado==='error'\|\|f\.estado==='duplicado_en_lote'\}/);
  assert.match(css,/\.qa-review-filter-active/);
 });

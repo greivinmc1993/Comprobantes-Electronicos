@@ -1,4 +1,4 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useRef,useState} from 'react';
 import Icon from './Icon';
 import SelectElegante from './SelectElegante';
 import {crc} from '../reportes';
@@ -6,19 +6,15 @@ import {asignarEmpresaMasiva,empresaCompatible} from './asignacion-masiva.mjs';
 import {esListo,necesitaRevision,esErrorDeLectura,esDuplicadoEnLote,exclusionInicial,marcarComprobantes,filtrarPorRevision} from './estado-revision.mjs';
 
 export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargando}) {
-  const [selecciones,setSelecciones]=useState({});
+  const [selecciones,setSelecciones]=useState(()=>Object.fromEntries((vista?.filas||[]).map(f=>[f.indice,String(f.empresaSugerida||'')])));
   const [excluidos,setExcluidos]=useState(()=>exclusionInicial(vista?.filas||[]));
   const [filtro,setFiltro]=useState('todos');
   const tablaRef=useRef(null);
   const [empresaMasiva,setEmpresaMasiva]=useState('');
   const [avisoMasivo,setAvisoMasivo]=useState('');
   const [limiteVisibles,setLimiteVisibles]=useState(200);
-  useEffect(()=>{
-    setSelecciones(Object.fromEntries((vista?.filas||[]).map(f=>[f.indice,String(f.empresaSugerida||'')])));
-    setExcluidos(exclusionInicial(vista?.filas||[]));
-    setFiltro('todos');
-    setEmpresaMasiva('');setAvisoMasivo('');setLimiteVisibles(200);
-  },[vista?.token]);
+  // El componente se remonta por token. La selección se inicializa antes
+  // del primer render visible para no depender del orden de los efectos en móvil.
   const filas=vista?.filas||[];
   const filasFiltradas=filtrarPorRevision(filas,filtro);
   const listos=filas.filter(esListo);
@@ -85,14 +81,14 @@ export default function VistaPrevia({vista,perfiles,onCerrar,onConfirmar,cargand
         <span className="qa-review-help">Los XML por revisar se dejan desmarcados hasta que los autorices.</span>
       </div>
       {filasFiltradas.length>limiteVisibles&&<p className="texto-secundario" role="status">Mostrando {limiteVisibles} de {filasFiltradas.length} comprobantes de esta vista. La asignación y confirmación incluyen todos los marcados, aunque no se vean en pantalla.</p>}
-      <div className="qa-table-scroll" ref={tablaRef}><table className="qa-table"><thead><tr>
+      <div className="qa-table-scroll" data-testid="qa-lista-xml" ref={tablaRef}><table className="qa-table"><thead><tr>
         <th><input type="checkbox" aria-label="Marcar todos los XML listos" disabled={cargando||!listos.length} checked={Boolean(listos.length)&&listos.every(f=>!excluidos[f.indice])} onChange={e=>marcarTodos(e.target.checked)}/></th>
         <th>XML / tipo</th><th>Importe</th><th>Empresa destino</th><th>Revisión</th></tr></thead>
       <tbody>{filasFiltradas.slice(0,limiteVisibles).map(f=>{
         const activo=!excluidos[f.indice];
         const elegido=perfiles.find(p=>String(p.id)===String(selecciones[f.indice]));
         const incompatible=activo&&Boolean(elegido)&&!empresaCompatible(f,elegido);
-        return <tr key={f.indice} className={incompatible?'qa-incompatible':''}>
+        return <tr key={f.indice} data-testid={`qa-fila-${f.indice}`} className={incompatible?'qa-incompatible':''}>
           <td><input aria-label={`Incluir ${f.archivo}`} type="checkbox" disabled={cargando||['error','duplicado_en_lote'].includes(f.estado)} checked={activo} onChange={e=>setExcluidos(v=>({...v,[f.indice]:!e.target.checked}))}/></td>
           <td><strong title={f.archivo}>{f.archivo}</strong><small>{f.tipo||'No procesado'} · {f.fecha?.slice(0,10)||'—'}</small><small className="qa-code" title={f.clave}>{f.clave||''}</small></td>
           <td><strong>{f.total==null?'—':crc(f.total)}</strong><small>{f.moneda||''}</small></td>

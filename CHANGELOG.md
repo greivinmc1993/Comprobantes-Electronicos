@@ -1,3 +1,11 @@
+## v1.4.17 — Estabilidad de la vista previa móvil y diagnóstico QA
+
+- Cada nueva vista previa inicializa selección y destinos antes del primer render, evitando carreras con efectos de React.
+- Cada fila tiene un identificador estable para pruebas de interacción sin depender del diseño de tabla o tarjetas.
+- Ajustes de área táctil y desplazamiento contenido en móvil, sin cambiar reglas de duplicados ni la selección automática.
+- Playwright separa por pasos la selección, asignación, filtros, validación y confirmación: los registros señalan dónde falla.
+- Permanecen protegidas las asignaciones por cédula, los XML con error y los pendientes desmarcados.
+
 ## 1.4.16 — Vista previa adaptable y QA móvil
 
 - La revisión de XML usa tarjetas responsivas en móviles y deja accesible la selección de empresa sin scroll horizontal.

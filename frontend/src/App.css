@@ -774,3 +774,17 @@ h1,h2,h3,p {margin-top:0}
   .qa-preview .qa-review-filter {flex:1 1 auto;justify-content:center;min-height:34px}
   .qa-preview .qa-bulk-toolbar .btn {white-space:normal;min-height:42px}
 }
+
+/* v1.4.17 — Controles de revisión móviles: clics estables dentro del scroll. */
+@media (max-width: 620px) {
+  .qa-preview .modal-body.qa-preview-body {overscroll-behavior:contain;scrollbar-gutter:stable;}
+  .qa-preview .qa-table-scroll {overscroll-behavior:contain;scrollbar-gutter:stable;}
+  .qa-preview .qa-table tbody tr {position:relative;}
+  .qa-preview .qa-table tbody td:nth-child(1) input[type="checkbox"] {
+    min-width:20px;min-height:20px;touch-action:manipulation;
+  }
+  .qa-preview .qa-table tbody td:nth-child(4) .select-elegante select {
+    min-height:42px;touch-action:manipulation;
+  }
+  .qa-preview .qa-review-filter {touch-action:manipulation;}
+}

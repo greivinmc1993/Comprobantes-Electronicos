@@ -1,4 +1,4 @@
-# Plan de QA — ComprobantesElectronicosCR v1.3.6
+# Plan de QA — ComprobantesElectronicosCR v1.4.17
 
 ## Alcance y prioridades
 
@@ -182,10 +182,16 @@ Los archivos reales de los usuarios **no forman parte de los fixtures**. Las pru
 - Los contadores de revisión son accesos directos; cambios de filtros no alteran la selección del lote.
 - Ejecutar la suite Node y Playwright en GitHub Actions (Chromium escritorio y móvil).
 
-## QA v1.4.16 — Revisión XML móvil
+## QA v1.4.17 — Revisión XML móvil
 
 - En Chromium móvil, comprobar que los controles de una fila (casilla, empresa y observación) están disponibles sin desplazamiento horizontal.
 - En escritorio y móvil, un XML por revisar se inicia desmarcado y no se activa con «Marcar listos».
 - Filtrar por estado nunca debe desplazar toda la ventana de revisión ni modificar las selecciones.
 - Asignar empresa a dos XML seleccionados conserva la validación individual y requiere confirmación.
 - Los resultados finales de Playwright se comprueban en GitHub Actions; la prueba no se considera superada hasta ejecutar Chromium con las dependencias instaladas.
+
+## v1.4.17 — Diagnóstico de las pruebas móviles
+
+Las pruebas `Importación masiva` y `Vista previa: filtrar pendientes y errores` usan `test.step()` para separar preparación, marcado, selección de empresa, aplicación y confirmación. En cada fase se verifica el estado antes de continuar. Si falla en Actions, abrir los artefactos `playwright-report` y `test-results` (traza y captura) para identificar el paso exacto; el resultado resumido `2 failed` no permite identificarlo.
+
+Los XML `requiere_empresa` deben comenzar desmarcados, y los `error` no deben admitirse. La asignación por cédula y el comportamiento de duplicados **no se han modificado**.

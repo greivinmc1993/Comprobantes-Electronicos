@@ -115,81 +115,104 @@ test('Centro contable y auditoría están disponibles en menú',async({page})=>{
 });
 
 test('Importación masiva: asignar dos XML a una empresa con una sola acción',async({page})=>{
- await page.evaluate(()=>{
-   window.comprobantesDesktop.previsualizar=async()=>({
-     token:'lote-masivo-qa',filas:[
-       {indice:0,archivo:'ficticio-a.xml',estado:'requiere_empresa',empresaSugerida:null,empresasCompatibles:[],sinCedula:[1,2],existentes:[],tipo:'Factura electrónica',total:113,moneda:'CRC'},
-       {indice:1,archivo:'ficticio-b.xml',estado:'requiere_empresa',empresaSugerida:null,empresasCompatibles:[],sinCedula:[1,2],existentes:[],tipo:'Nota de crédito',total:-15,moneda:'CRC'},
-     ]
-   });
+ await test.step('Preparar lote sintético antes de subir',async()=>{
+  await page.evaluate(()=>{
+   window.comprobantesDesktop.previsualizar=async()=>({token:'lote-masivo-qa',filas:[
+    {indice:0,archivo:'ficticio-a.xml',estado:'requiere_empresa',empresaSugerida:null,empresasCompatibles:[],sinCedula:[1,2],existentes:[],tipo:'Factura electrónica',total:113,moneda:'CRC'},
+    {indice:1,archivo:'ficticio-b.xml',estado:'requiere_empresa',empresaSugerida:null,empresasCompatibles:[],sinCedula:[1,2],existentes:[],tipo:'Nota de crédito',total:-15,moneda:'CRC'},
+   ]});
    window.comprobantesDesktop.confirmarImportacion=async(token,selecciones)=>{
-     window.__qaImportacionMasiva={token,selecciones};
-     return {loteId:5,nuevos:2,duplicados:0};
+    window.__qaImportacionMasiva={token,selecciones};
+    return {loteId:5,nuevos:2,duplicados:0};
    };
+  });
+  await page.getByRole('button',{name:'Importación inteligente'}).click();
+  await page.locator('input[type=file]').first().setInputFiles({name:'lote.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')});
  });
- await page.getByRole('button',{name:'Importación inteligente'}).click();
- await page.locator('input[type=file]').first().setInputFiles({name:'lote.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')});
  const modal=page.getByRole('dialog',{name:'Vista previa de importación XML'});
- await expect(modal).toBeVisible();
- await expect(modal.getByRole('button',{name:'Ver 2 XML por revisar'})).toBeVisible();
- if(page.viewportSize().width<=620){
+ await test.step('Dos XML por revisar visibles y desmarcados',async()=>{
+  await expect(modal).toBeVisible();
+  await expect(modal.getByRole('button',{name:'Ver 2 XML por revisar'})).toBeVisible();
+  if(page.viewportSize().width<=620){
    await expect(modal.locator('.qa-table')).toHaveCSS('min-width','0px');
-   await expect(modal.locator('.qa-table-scroll')).toHaveCSS('overflow-x','hidden');
- }
- // Los XML sin empresa sugerida no se seleccionan hasta que el usuario los autoriza.
- await expect(modal.getByRole('checkbox',{name:'Incluir ficticio-a.xml'})).not.toBeChecked();
- await expect(modal.getByRole('checkbox',{name:'Incluir ficticio-b.xml'})).not.toBeChecked();
- await modal.getByRole('checkbox',{name:'Incluir ficticio-a.xml'}).check();
- await modal.getByRole('checkbox',{name:'Incluir ficticio-b.xml'}).check();
- await modal.getByLabel('Empresa para asignación masiva').selectOption('2');
- await modal.getByRole('button',{name:/Asignar a 2 XML/}).click();
- await expect(modal.getByRole('status')).toContainText('2 XML asignados');
- await modal.getByRole('button',{name:'Confirmar 2 XML'}).click();
- await expect(modal).toBeHidden();
- const importacion=await page.evaluate(()=>window.__qaImportacionMasiva);
- expect(importacion.token).toBe('lote-masivo-qa');
- expect(importacion.selecciones).toEqual([{indice:0,perfilId:2},{indice:1,perfilId:2}]);
+   await expect(modal.getByTestId('qa-lista-xml')).toHaveCSS('overflow-x','hidden');
+  }
+  await expect(modal.getByTestId('qa-fila-0').getByRole('checkbox',{name:'Incluir ficticio-a.xml'})).not.toBeChecked();
+  await expect(modal.getByTestId('qa-fila-1').getByRole('checkbox',{name:'Incluir ficticio-b.xml'})).not.toBeChecked();
+ });
+ await test.step('Autorizar manualmente los dos XML',async()=>{
+  for(const [indice,archivo] of [[0,'ficticio-a.xml'],[1,'ficticio-b.xml']]){
+   const casilla=modal.getByTestId(`qa-fila-${indice}`).getByRole('checkbox',{name:`Incluir ${archivo}`});
+   await casilla.scrollIntoViewIfNeeded();
+   await casilla.check();
+   await expect(casilla).toBeChecked();
+  }
+ });
+ await test.step('Asignar empresa masivamente y verificar ambas filas',async()=>{
+  const empresa=modal.getByLabel('Empresa para asignación masiva');
+  await empresa.selectOption('2');
+  await expect(empresa).toHaveValue('2');
+  const asignar=modal.getByRole('button',{name:/Asignar a 2 XML/});
+  await expect(asignar).toBeEnabled();
+  await asignar.click();
+  await expect(modal.getByRole('status')).toContainText('2 XML asignados');
+  for(const indice of [0,1]){
+   await expect(modal.getByTestId(`qa-fila-${indice}`).getByRole('combobox')).toHaveValue('2');
+  }
+ });
+ await test.step('Confirmar lote sin modificar empresa ni signos',async()=>{
+  const confirmar=modal.getByRole('button',{name:'Confirmar 2 XML'});
+  await expect(confirmar).toBeEnabled();
+  await confirmar.click();
+  await expect(modal).toBeHidden();
+  const importacion=await page.evaluate(()=>window.__qaImportacionMasiva);
+  expect(importacion.token).toBe('lote-masivo-qa');
+  expect(importacion.selecciones).toEqual([{indice:0,perfilId:2},{indice:1,perfilId:2}]);
+ });
 });
-
 
 // v1.4.15: un XML sin empresa no debe colarse en «Marcar listos».
 test('Vista previa: filtrar pendientes y errores sin marcar XML por revisar',async({page})=>{
  await page.evaluate(()=>{
-   window.comprobantesDesktop.previsualizar=async()=>({token:'qa-v1415',filas:[
-     {indice:0,archivo:'qa-listo.xml',estado:'listo',empresaSugerida:1,empresasCompatibles:[],total:113,moneda:'CRC'},
-     {indice:1,archivo:'qa-pendiente.xml',estado:'requiere_empresa',empresaSugerida:null,empresasCompatibles:[],total:88,moneda:'CRC'},
-     {indice:2,archivo:'qa-error.xml',estado:'error',error:'XML inválido'},
-   ]});
+  window.comprobantesDesktop.previsualizar=async()=>({token:'qa-v1415',filas:[
+   {indice:0,archivo:'qa-listo.xml',estado:'listo',empresaSugerida:1,empresasCompatibles:[],total:113,moneda:'CRC'},
+   {indice:1,archivo:'qa-pendiente.xml',estado:'requiere_empresa',empresaSugerida:null,empresasCompatibles:[],total:88,moneda:'CRC'},
+   {indice:2,archivo:'qa-error.xml',estado:'error',error:'XML inválido'},
+  ]});
  });
  await page.getByRole('button',{name:'Importación inteligente'}).click();
  await page.locator('input[type=file]').first().setInputFiles({name:'archivo.xml',mimeType:'application/xml',buffer:Buffer.from('<FacturaElectronica/>')});
  const modal=page.getByRole('dialog',{name:'Vista previa de importación XML'});
- const listo=modal.getByRole('checkbox',{name:'Incluir qa-listo.xml'});
  const pendiente=modal.getByRole('checkbox',{name:'Incluir qa-pendiente.xml'});
- const error=modal.getByRole('checkbox',{name:'Incluir qa-error.xml'});
- await expect(listo).toBeChecked();
- await expect(pendiente).not.toBeChecked();
- await expect(error).toBeDisabled();
- await modal.getByRole('button',{name:'Marcar listos'}).click();
- await expect(pendiente).not.toBeChecked();
- await modal.getByRole('button',{name:'Ver 1 XML por revisar'}).click();
- await expect(modal.getByText('qa-pendiente.xml')).toBeVisible();
- await expect(modal.getByText('qa-listo.xml')).toHaveCount(0);
- // La empresa se puede elegir aunque el documento pendiente siga desmarcado.
- const destino=modal.getByLabel('Empresa destino para qa-pendiente.xml');
- await expect(destino).toBeVisible();
- await destino.selectOption('1');
- await expect(destino).toHaveValue('1');
- await expect(pendiente).not.toBeChecked();
- await pendiente.check();
- await modal.getByRole('button',{name:'Ver 1 XML con error'}).click();
- await expect(modal.getByText('qa-error.xml')).toBeVisible();
- await expect(modal.getByText('qa-pendiente.xml')).toHaveCount(0);
- await modal.getByRole('button',{name:/Todos 3/}).click();
- await expect(pendiente).toBeChecked();
- await expect(modal.getByRole('button',{name:'Confirmar 2 XML'})).toBeEnabled();
+ await test.step('Estado inicial: solo el listo está seleccionado',async()=>{
+  await expect(modal.getByTestId('qa-fila-0').getByRole('checkbox',{name:'Incluir qa-listo.xml'})).toBeChecked();
+  await expect(pendiente).not.toBeChecked();
+  await expect(modal.getByTestId('qa-fila-2').getByRole('checkbox',{name:'Incluir qa-error.xml'})).toBeDisabled();
+  await modal.getByRole('button',{name:'Marcar listos'}).click();
+  await expect(pendiente).not.toBeChecked();
+ });
+ await test.step('Filtrar pendientes y elegir empresa sin marcarlos',async()=>{
+  await modal.getByRole('button',{name:'Ver 1 XML por revisar'}).click();
+  await expect(modal.getByTestId('qa-fila-1')).toBeVisible();
+  await expect(modal.getByTestId('qa-fila-0')).toHaveCount(0);
+  const destino=modal.getByLabel('Empresa destino para qa-pendiente.xml');
+  await expect(destino).toBeVisible();
+  await destino.selectOption('1');
+  await expect(destino).toHaveValue('1');
+  await expect(pendiente).not.toBeChecked();
+  await pendiente.scrollIntoViewIfNeeded();
+  await pendiente.check();
+  await expect(pendiente).toBeChecked();
+ });
+ await test.step('Filtrar errores y volver a todos sin perder selección',async()=>{
+  await modal.getByRole('button',{name:'Ver 1 XML con error'}).click();
+  await expect(modal.getByTestId('qa-fila-2')).toBeVisible();
+  await expect(modal.getByTestId('qa-fila-1')).toHaveCount(0);
+  await modal.getByRole('button',{name:/Todos 3/}).click();
+  await expect(modal.getByTestId('qa-fila-1').getByRole('checkbox',{name:'Incluir qa-pendiente.xml'})).toBeChecked();
+  await expect(modal.getByRole('button',{name:'Confirmar 2 XML'})).toBeEnabled();
+ });
 });
-
 
 // Regresión responsive: el destino de un XML pendiente se muestra sin scroll horizontal.
 test('Vista previa móvil: empresa y revisión accesibles sin desplazamiento horizontal',async({page})=>{

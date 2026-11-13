@@ -887,7 +887,7 @@ export default function App() {
       </main>
     </div>
 
-    <VistaPrevia vista={vistaImportacion} perfiles={perfiles} cargando={cargando}
+    <VistaPrevia key={vistaImportacion?.token||'sin-vista'} vista={vistaImportacion} perfiles={perfiles} cargando={cargando}
       onCerrar={()=>setVistaImportacion(null)}
       onConfirmar={confirmarImportacionInteligente}/>
 
